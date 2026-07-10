@@ -2,10 +2,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const API_BASE =
-  typeof window !== 'undefined' &&
+  process.env.NEXT_PUBLIC_API_BASE ||
+  (typeof window !== 'undefined' &&
   (window.location.protocol === 'file:' || window.location.hostname === 'localhost')
     ? 'http://34.27.148.238:4000'
-    : '';
+    : '');
 
 const AuthContext = createContext(null);
 
