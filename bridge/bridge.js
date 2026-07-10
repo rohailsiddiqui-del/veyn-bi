@@ -17,16 +17,18 @@ const FormData = require('form-data');
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 
 const DEFAULT_CONFIG = {
-  // Voice App API (office LAN)
-  voiceAppHost:   'http://10.0.0.24',
-  evalPort:        8018,
-  transPort:       8002,
+  // Voice App — eval + login (public)
+  evalBaseUrl:    'https://autovox-be.veyn.co.uk',
   voiceUsername:  'aihadmin',
   voicePassword:  'aih@321',
+
+  // Voice App — translation API (public, static token)
+  transBaseUrl:   'https://autovox-translation-api.veyn.ai',
+  transToken:     'd1cf7f8c46caf960cae2ff929796a3bc7bedd191364db10f2edc4fa7f5abfd4a',
   orgId:           45,
 
   // Veyn BI GCP API
-  gcpApiUrl:      'https://YOUR-GCP-DOMAIN',   // e.g. http://34.27.148.238:4000
+  gcpApiUrl:      'http://34.27.148.238:4000',
   gcpEmail:       'admin@logoshoes.com',
   gcpPassword:    'test123',
 
@@ -56,7 +58,7 @@ function dateRange(daysBack) {
 }
 
 async function voiceAppLogin(cfg) {
-  const url = `${cfg.voiceAppHost}:${cfg.evalPort}/rbac/auth-user/login/`;
+  const url = `${cfg.evalBaseUrl}/rbac/auth-user/login/`;
   const res = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -70,7 +72,7 @@ async function voiceAppLogin(cfg) {
 }
 
 async function fetchEvalCSV(cfg, token, range) {
-  const url = `${cfg.voiceAppHost}:${cfg.evalPort}/core/call-evaluation/evaluation_list/?download=1&key=duration&order=desc&date_range=${range}`;
+  const url = `${cfg.evalBaseUrl}/core/call-evaluation/evaluation_list/?download=1&key=duration&order=desc&date_range=${range}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Eval fetch failed: HTTP ${res.status}`);
   const text = await res.text();
@@ -78,12 +80,12 @@ async function fetchEvalCSV(cfg, token, range) {
   return text;
 }
 
-async function fetchTransCSV(cfg, token, orgId, range) {
-  const url = `${cfg.voiceAppHost}:${cfg.transPort}/core/call-evaluation/get_all_transcriptions/?date_range=${range}&org_id=${orgId}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`Transcription fetch failed: HTTP ${res.status}`);
+async function fetchTransCSV(cfg, orgId, range) {
+  const url = `${cfg.transBaseUrl}/get_all_translations?date_range=${range}&org_id=${orgId}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${cfg.transToken}` } });
+  if (!res.ok) throw new Error(`Translation fetch failed: HTTP ${res.status}`);
   const text = await res.text();
-  console.log(`[bridge] Fetched transcription CSV (${text.length} bytes)`);
+  console.log(`[bridge] Fetched translation CSV (${text.length} bytes)`);
   return text;
 }
 
@@ -163,7 +165,7 @@ async function run() {
 
   // 2. Fetch CSVs
   const evalCsv  = await fetchEvalCSV(cfg, voiceToken, range);
-  const rawTrans = await fetchTransCSV(cfg, voiceToken, orgId, range);
+  const rawTrans = await fetchTransCSV(cfg, orgId, range);
   const transCsv = normaliseTransCSV(rawTrans);
 
   // 3. Login to GCP

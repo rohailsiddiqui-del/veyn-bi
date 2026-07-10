@@ -1,9 +1,10 @@
 {
-  "voiceAppHost": "http://10.0.0.24",
-  "evalPort": 8018,
-  "transPort": 8002,
+  "evalBaseUrl": "https://autovox-be.veyn.co.uk",
   "voiceUsername": "aihadmin",
   "voicePassword": "aih@321",
+
+  "transBaseUrl": "https://autovox-translation-api.veyn.ai",
+  "transToken": "d1cf7f8c46caf960cae2ff929796a3bc7bedd191364db10f2edc4fa7f5abfd4a",
   "orgId": 45,
 
   "gcpApiUrl": "http://34.27.148.238:4000",
