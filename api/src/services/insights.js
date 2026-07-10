@@ -41,10 +41,10 @@ Extract and return a JSON object with EXACTLY this structure (no extra keys, no 
   "signal_intelligence": {
     "threat_detected": boolean,
     "threat_details": "string or null — describe any legal threat, chargeback threat, violence threat",
-    "social_media_mention": boolean,
-    "social_media_details": "string or null — e.g. 'Customer mentioned posting on Facebook'",
-    "escalation_request": boolean,
-    "escalation_details": "string or null — e.g. 'Customer asked to speak to manager'",
+    "social_media_mention": boolean — true ONLY if customer THREATENS to post negatively (bad review, complaint post, viral video etc.) on social media. Do NOT flag if customer merely asks about company social media accounts or mentions using WhatsApp to contact support,
+    "social_media_details": "string or null — describe the specific threat e.g. 'Customer threatened to post a negative review on Facebook'",
+    "escalation_request": boolean — true ONLY if customer explicitly requests to speak to a supervisor, manager, senior, or higher authority. Do NOT flag if customer simply asks a question that happens to involve another person or department,
+    "escalation_details": "string or null — e.g. 'Customer demanded to speak to the regional manager'",
     "regulatory_mention": boolean,
     "regulatory_details": "string or null — e.g. 'Customer mentioned SECP, consumer court, ombudsman'"
   },
