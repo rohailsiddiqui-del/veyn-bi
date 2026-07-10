@@ -19,13 +19,13 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const DEFAULT_CONFIG = {
   // Voice App — eval + login (public)
   evalBaseUrl:    'https://autovox-be.veyn.co.uk',
-  voiceUsername:  'aihadmin',
-  voicePassword:  'aih@321',
+  voiceUsername:  'logoadmin',
+  voicePassword:  'logo@321',
 
   // Voice App — translation API (public, static token)
   transBaseUrl:   'https://autovox-translation-api.veyn.ai',
   transToken:     'd1cf7f8c46caf960cae2ff929796a3bc7bedd191364db10f2edc4fa7f5abfd4a',
-  orgId:           45,
+  orgId:           64,
 
   // Veyn BI GCP API
   gcpApiUrl:      'http://34.27.148.238:4000',
