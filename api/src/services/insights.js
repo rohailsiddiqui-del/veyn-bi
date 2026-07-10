@@ -39,8 +39,8 @@ Extract and return a JSON object with EXACTLY this structure (no extra keys, no 
   },
   "top_complaints": ["array of up to 5 specific complaint phrases or issues raised by the customer, extracted verbatim or paraphrased clearly"],
   "signal_intelligence": {
-    "threat_detected": boolean,
-    "threat_details": "string or null — describe any legal threat, chargeback threat, violence threat",
+    "threat_detected": boolean — true if customer threatens legal action (consumer court, lawsuit, FIA, ombudsman), chargeback/dispute, negative escalation, or any form of retaliation,
+    "threat_details": "string or null — describe the specific threat e.g. 'Customer threatened to file a consumer court case'",
     "social_media_mention": boolean — true ONLY if customer THREATENS to post negatively (bad review, complaint post, viral video etc.) on social media. Do NOT flag if customer merely asks about company social media accounts or mentions using WhatsApp to contact support,
     "social_media_details": "string or null — describe the specific threat e.g. 'Customer threatened to post a negative review on Facebook'",
     "escalation_request": boolean — true ONLY if customer explicitly requests to speak to a supervisor, manager, senior, or higher authority. Do NOT flag if customer simply asks a question that happens to involve another person or department,
@@ -65,9 +65,9 @@ Extract and return a JSON object with EXACTLY this structure (no extra keys, no 
 }
 `;
 
-function smartTruncate(text, max = 2000) {
+function smartTruncate(text, max = 12000) {
   if (!text || text.length <= max) return text;
-  return text.slice(0, 1500) + '\n...\n' + text.slice(-500);
+  return text.slice(0, 9000) + '\n...\n' + text.slice(-3000);
 }
 
 async function extractInsights(transcriptText, industry = 'generic') {
