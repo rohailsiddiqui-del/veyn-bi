@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veyn.ai — CX Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg: #07090F;
+    --surface: #0E1320;
+    --surface2: #141A2E;
+    --border: #1E2A42;
+    --border2: #263352;
+    --purple: #7C3AED;
+    --purple-soft: #A78BFA;
+    --green: #10B981;
+    --amber: #F59E0B;
+    --red: #EF4444;
+    --blue: #3B82F6;
+    --text: #E2E8F0;
+    --muted: #64748B;
+    --label: #94A3B8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+  /* AUTH */
+  #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .auth-box { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 40px; width: 380px; }
+  .auth-logo { font-size: 22px; font-weight: 700; color: var(--purple-soft); margin-bottom: 8px; }
+  .auth-sub { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+  .auth-box input { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; margin-bottom: 12px; outline: none; }
+  .auth-box input:focus { border-color: var(--purple); }
+  .btn-primary { width: 100%; background: var(--purple); color: #fff; border: none; border-radius: 8px; padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-primary:hover { background: #6D28D9; }
+  .auth-err { color: var(--red); font-size: 12px; margin-top: 8px; }
+  .auth-org-badge {
+    background: rgba(124,58,237,0.12);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--purple-soft);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  /* LAYOUT */
+  #app { display: none; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; width: 220px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 24px 0; display: flex; flex-direction: column;
+    /* Subtle top accent gradient */
+    background-image: linear-gradient(to bottom, rgba(124,58,237,0.08) 0%, transparent 80px);
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    /* Top accent line */
+    position: relative;
+  }
+  .sidebar-logo::before {
+    content: '';
+    position: absolute;
+    top: -24px; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--purple), var(--purple-soft), transparent);
+  }
+  .sidebar-logo-text { font-size: 18px; font-weight: 700; color: var(--purple-soft); }
+  .sidebar-logo-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+  .nav { padding: 16px 12px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--label); margin-bottom: 2px; transition: all 0.15s; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(124,58,237,0.15); color: var(--purple-soft); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-tenant { padding: 16px 20px; border-top: 1px solid var(--border); }
+  .tenant-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .tenant-role { font-size: 11px; color: var(--muted); }
+  .logout-btn { font-size: 11px; color: var(--muted); cursor: pointer; margin-top: 6px; }
+  .logout-btn:hover { color: var(--red); }
+
+  .main { margin-left: 220px; padding: 0 32px 28px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* GLOBAL DATE FILTER */
+  .global-date-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 32px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    margin-left: 220px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .global-date-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .global-date-input {
+    background: var(--bg); border: 1px solid var(--border2); border-radius: 8px;
+    padding: 6px 12px; font-size: 13px; color: var(--text); outline: none;
+    cursor: pointer; width: 160px;
+  }
+  .global-date-input:focus { border-color: var(--purple); }
+  .global-date-clear {
+    font-size: 12px; color: var(--purple-soft); cursor: pointer;
+    background: none; border: none; text-decoration: underline;
+    display: none;
+  }
+  .global-date-badge {
+    font-size: 11px; padding: 3px 10px; border-radius: 20px;
+    background: rgba(124,58,237,0.12); color: var(--purple-soft);
+    border: 1px solid rgba(124,58,237,0.25);
+    display: none;
+  }
+
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-title { font-size: 22px; font-weight: 600; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .filters { display: flex; gap: 10px; align-items: center; }
+  .filter-select { background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); padding: 7px 12px; font-size: 13px; cursor: pointer; outline: none; }
+
+  /* KPI CARDS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  /* KPI left border accents */
+  .kpi-card-purple { border-left: 3px solid var(--purple); }
+  .kpi-card-green  { border-left: 3px solid var(--green); }
+  .kpi-card-red    { border-left: 3px solid var(--red); }
+  .kpi-card-amber  { border-left: 3px solid var(--amber); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .kpi-green { color: var(--green); }
+  .kpi-amber { color: var(--amber); }
+  .kpi-red { color: var(--red); }
+  .kpi-purple { color: var(--purple-soft); }
+
+  /* CHARTS */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--label); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* TABLE */
+  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; overflow-x: auto; }
+  .table-title { font-size: 13px; font-weight: 600; color: var(--label); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.06em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .score-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .score-high { background: rgba(16,185,129,0.12); color: var(--green); }
+  .score-mid { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .score-low { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  /* PARAMS BAR */
+  .param-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .param-name { font-size: 12px; color: var(--label); width: 260px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .param-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 3px; }
+  .param-bar { height: 6px; border-radius: 3px; transition: width 0.6s ease; }
+  .param-pct { font-size: 11px; color: var(--muted); width: 40px; text-align: right; flex-shrink: 0; }
+
+  /* CHAT */
+  .chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 140px); }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px 12px 0 0; }
+  .chat-msg { margin-bottom: 16px; }
+  .chat-msg.user .bubble { background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); margin-left: auto; max-width: 70%; }
+  .chat-msg.bot .bubble { background: var(--surface2); border: 1px solid var(--border2); max-width: 80%; }
+  .bubble { padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
+  .bubble-role { font-size: 10px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .chat-input-row { display: flex; gap: 10px; background: var(--surface); border: 1px solid var(--border2); border-top: none; border-radius: 0 0 12px 12px; padding: 12px; }
+  .chat-input { flex: 1; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; }
+  .chat-input:focus { border-color: var(--purple); }
+  .chat-send { background: var(--purple); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chat-send:hover { background: #6D28D9; }
+  .typing { color: var(--muted); font-size: 12px; font-style: italic; padding: 8px 0; }
+
+  /* UPLOAD */
+  .upload-zone { border: 2px dashed var(--border2); border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .upload-zone:hover { border-color: var(--purple); background: rgba(124,58,237,0.04); }
+  .upload-zone-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .upload-zone-sub { font-size: 12px; color: var(--muted); }
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .file-drop { border: 1px solid var(--border2); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; }
+  .file-drop:hover { border-color: var(--purple-soft); }
+  .file-drop.has-file { border-color: var(--green); background: rgba(16,185,129,0.05); }
+  .file-drop-label { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .file-drop-name { font-size: 12px; color: var(--green); margin-top: 4px; font-weight: 500; }
+  input[type=file] { display: none; }
+  .batch-list { margin-top: 24px; }
+
+  .loading { text-align: center; padding: 60px; color: var(--muted); font-size: 14px; }
+  .gemini-key-note { font-size: 12px; color: var(--amber); background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+
+  /* INSIGHTS */
+  .insights-section { margin-bottom: 28px; }
+  .section-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+  .kpi-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .kpi-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+  .signal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .signal-card.alert { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.04); }
+  .signal-card.warn  { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.04); }
+  .signal-count { font-size: 26px; font-weight: 700; line-height: 1; }
+  .signal-label { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .signal-icon { font-size: 18px; margin-bottom: 6px; }
+
+  .complaint-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .complaint-item:last-child { border-bottom: none; }
+  .complaint-rank { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; width: 24px; flex-shrink: 0; }
+  .complaint-text { flex: 1; font-size: 13px; }
+  .complaint-freq { font-size: 12px; color: var(--purple-soft); font-weight: 600; background: rgba(124,58,237,0.1); padding: 2px 10px; border-radius: 20px; }
+
+  .moment-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .moment-item:last-child { border-bottom: none; }
+  .moment-type { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; flex-shrink: 0; white-space: nowrap; }
+  .moment-escalation { background: rgba(239,68,68,0.12); color: var(--red); }
+  .moment-resolution { background: rgba(16,185,129,0.12); color: var(--green); }
+  .moment-complaint  { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .moment-positive   { background: rgba(59,130,246,0.12); color: var(--blue); }
+  .moment-default    { background: rgba(100,116,139,0.12); color: var(--muted); }
+  .moment-desc { font-size: 13px; color: var(--label); flex: 1; }
+  .moment-freq { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+  .sentiment-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .sentiment-name { font-size: 12px; color: var(--label); width: 140px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sentiment-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; position: relative; }
+  .sentiment-fill { height: 8px; border-radius: 4px; }
+  .sentiment-val { font-size: 11px; color: var(--muted); width: 36px; text-align: right; flex-shrink: 0; }
+
+  .signal-table-row { cursor: pointer; }
+  .signal-table-row:hover td { background: var(--surface2); }
+  .signal-table-row.expanded td { background: var(--surface2); }
+  .flag-pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-right: 4px; }
+  .flag-threat { background: rgba(239,68,68,0.15); color: var(--red); }
+  .flag-social { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .flag-escalation { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .flag-regulatory { background: rgba(167,139,250,0.15); color: var(--purple-soft); }
+  .reasoning-row td { padding: 0 !important; }
+  .reasoning-panel { background: var(--surface2); border-top: 1px solid var(--border); padding: 16px 20px; display: none; }
+  .reasoning-panel.open { display: block; }
+  .reasoning-panel h4 { font-size: 12px; font-weight: 600; color: var(--label); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; margin-top: 14px; }
+  .reasoning-panel h4:first-child { margin-top: 0; }
+  .reasoning-summary { font-size: 13px; color: var(--text); line-height: 1.6; }
+  .reasoning-flags { display: flex; flex-direction: column; gap: 6px; }
+  .reasoning-flag-item { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; }
+  .reasoning-flag-label { flex-shrink: 0; font-weight: 600; min-width: 90px; }
+  .reasoning-flag-detail { color: var(--label); line-height: 1.5; }
+  .reasoning-moments { display: flex; flex-direction: column; gap: 4px; }
+  .reasoning-moment { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .reasoning-moment:last-child { border-bottom: none; }
+  .reasoning-moment-type { flex-shrink: 0; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .reasoning-moment-desc { color: var(--label); flex: 1; }
+  .reasoning-moment-ts { color: var(--muted); flex-shrink: 0; font-family: 'DM Mono', monospace; }
+
+  .process-btn { background: var(--surface2); border: 1px solid var(--border2); color: var(--purple-soft); border-radius: 8px; padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .process-btn:hover { border-color: var(--purple); }
+  .insights-status { font-size: 12px; color: var(--muted); margin-left: 10px; }
+
+  /* COACHING PANEL */
+  .coaching-row td { padding: 0 !important; }
+  .coaching-panel { background: rgba(124,58,237,0.05); border-top: 1px solid var(--border); padding: 14px 20px; display: none; }
+  .coaching-panel.open { display: block; }
+  .coaching-panel h4 { font-size: 11px; font-weight: 600; color: var(--purple-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; margin-top: 12px; }
+  .coaching-panel h4:first-child { margin-top: 0; }
+  .coaching-param-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .coaching-param-name { font-size: 12px; color: var(--label); width: 240px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .coaching-param-bar-wrap { flex: 1; height: 5px; background: var(--border); border-radius: 3px; }
+  .coaching-param-bar { height: 5px; border-radius: 3px; }
+  .coaching-param-pct { font-size: 11px; color: var(--muted); width: 38px; text-align: right; flex-shrink: 0; }
+  .coaching-sample { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .coaching-sample span { font-family: 'DM Mono', monospace; color: var(--label); }
+
+  /* DELETE BUTTON */
+  .btn-delete { background: transparent; border: 1px solid rgba(239,68,68,0.3); color: var(--red); border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer; }
+  .btn-delete:hover { background: rgba(239,68,68,0.1); border-color: var(--red); }
+
+  /* EXPORT BUTTONS */
+  .export-btn { background: var(--surface2); border: 1px solid var(--border2); color: var(--label); border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .export-btn:hover { border-color: var(--purple-soft); color: var(--purple-soft); }
+
+  /* DIRECTION RADIO */
+  .direction-group { display: flex; gap: 10px; margin-bottom: 16px; }
+  .direction-opt { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 7px 14px; border: 1px solid var(--border2); border-radius: 8px; font-size: 13px; transition: all 0.15s; }
+  .direction-opt:has(input:checked) { border-color: var(--purple); background: rgba(124,58,237,0.08); color: var(--purple-soft); }
+  .direction-opt input { accent-color: var(--purple); }
+
+  /* TRANSCRIPT PANEL */
+  .transcript-block { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--label); line-height: 1.7; max-height: 280px; overflow-y: auto; margin-top: 4px; white-space: pre-wrap; }
+  .audit-meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  /* CONFIRM MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 360px; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .modal-body { font-size: 13px; color: var(--label); margin-bottom: 22px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-cancel { background: var(--surface2); border: 1px solid var(--border2); color: var(--label); border-radius: 8px; padding: 8px 18px; font-size: 13px; cursor: pointer; }
+  .modal-confirm-del { background: var(--red); border: none; color: #fff; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  /* WHITE THEME */
+  body.theme-white {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface2: #F1F5F9;
+    --border: #E2E8F0;
+    --border2: #CBD5E1;
+    --text: #0F172A;
+    --muted: #64748B;
+    --label: #475569;
+  }
+  body.theme-white .sidebar { box-shadow: 2px 0 8px rgba(0,0,0,0.06); }
+  body.theme-white .kpi-value { color: #0F172A; }
+  body.theme-white .kpi-green { color: var(--green); }
+  body.theme-white .kpi-red { color: var(--red); }
+  body.theme-white .kpi-amber { color: var(--amber); }
+  body.theme-white .kpi-purple { color: var(--purple); }
+  body.theme-white th { color: #64748B; }
+  body.theme-white .nav-item { color: #475569; }
+  body.theme-white .nav-item.active { color: var(--purple); }
+  body.theme-white .auth-box input { color: #0F172A; }
+
+  /* THEME TOGGLE */
+  .theme-toggle { display: flex; gap: 4px; margin-top: 8px; }
+  .theme-btn { flex: 1; padding: 4px 0; font-size: 10px; border-radius: 6px; border: 1px solid var(--border2); cursor: pointer; background: var(--surface2); color: var(--muted); }
+  .theme-btn.active { border-color: var(--purple); color: var(--purple-soft); background: rgba(124,58,237,0.08); }
+
+  /* EXPORT DROPDOWN */
+  .export-dropdown { position: relative; display: inline-block; }
+  .export-dropdown-menu { display: none; position: absolute; bottom: 110%; left: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; min-width: 190px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.2); overflow: hidden; }
+  .export-dropdown-menu.open { display: block; }
+  .export-menu-item { padding: 10px 14px; font-size: 12px; cursor: pointer; color: var(--label); border-bottom: 1px solid var(--border); }
+  .export-menu-item:last-child { border-bottom: none; }
+  .export-menu-item:hover { background: var(--surface2); color: var(--text); }
+  .export-menu-label { padding: 8px 14px 4px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+
+  @media print {
+    #auth-screen, .sidebar, .filters, .process-btn, .export-btn, .btn-delete, .chat-input-row, .modal-overlay, .theme-toggle, .export-dropdown { display: none !important; }
+    .main { margin-left: 0 !important; }
+    body { background: #fff !important; color: #000 !important; }
+    .page { display: block !important; page-break-after: always; }
+    .kpi-card, .chart-card, .table-card { border: 1px solid #ddd !important; background: #fff !important; }
+    .kpi-value, .page-title { color: #000 !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">⚡ Veyn.ai</div>
+    <div class="auth-sub">CX Intelligence Platform</div>
+    <div class="auth-org-badge" id="auth-org-badge" style="display:none;"></div>
+    <input type="email" id="login-email" placeholder="Email" value="admin@logoshoes.com" />
+    <input type="password" id="login-pass" placeholder="Password" value="test123" />
+    <button class="btn-primary" onclick="doLogin()">Sign in</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal-box">
+    <div class="modal-title">Delete Agent Data</div>
+    <div class="modal-body" id="delete-modal-body">This will permanently delete all calls, scores, transcripts, and insights for this agent. This cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeDeleteModal()">Cancel</button>
+      <button class="modal-confirm-del" id="delete-modal-confirm">Delete All</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">⚡ Veyn.ai</div>
+      <div class="sidebar-logo-sub" id="sidebar-org-name">CX Intelligence</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="showPage('overview')"><span class="nav-icon">📊</span> Overview</div>
+      <div class="nav-item" onclick="showPage('agents')"><span class="nav-icon">👥</span> Agents</div>
+      <div class="nav-item" onclick="showPage('params')"><span class="nav-icon">🎯</span> Parameters</div>
+      <div class="nav-item" onclick="showPage('trend')"><span class="nav-icon">📈</span> Trends</div>
+      <div class="nav-item" onclick="showPage('insights')"><span class="nav-icon">🧠</span> Insights</div>
+      <div class="nav-item" onclick="showPage('chat')"><span class="nav-icon">💬</span> AI Chat</div>
+      <div class="nav-item" onclick="showPage('upload')"><span class="nav-icon">📤</span> Upload</div>
+      <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">🔔</span> Alerts</div>
+    </nav>
+    <div class="sidebar-tenant">
+      <div class="tenant-name" id="tenant-name">—</div>
+      <div class="tenant-role" id="tenant-role">—</div>
+      <div class="export-dropdown" style="margin-top:8px;">
+        <button class="export-btn" style="width:100%;font-size:11px;" onclick="toggleExportMenu()">⬇ Export ▾</button>
+        <div class="export-dropdown-menu" id="export-menu">
+          <div class="export-menu-label">Download</div>
+          <div class="export-menu-item" onclick="exportCSV('flagged')">📋 Flagged Calls CSV</div>
+          <div class="export-menu-item" onclick="exportCSV('agents')">👥 Agent Performance CSV</div>
+          <div class="export-menu-item" onclick="exportCSV('params')">🎯 Parameter Analysis CSV</div>
+          <div class="export-menu-item" onclick="exportPDF()">🖨 Print / PDF</div>
+          <div class="export-menu-item" onclick="exportHTML()">💾 Save HTML</div>
+        </div>
+      </div>
+      <div class="theme-toggle">
+        <button class="theme-btn active" id="theme-dark-btn" onclick="setTheme('dark')">🌙 Dark</button>
+        <button class="theme-btn" id="theme-light-btn" onclick="setTheme('light')">☀ Light</button>
+      </div>
+      <div class="logout-btn" onclick="doLogout()">Sign out</div>
+    </div>
+  </div>
+
+  <!-- GLOBAL DATE FILTER BAR -->
+  <div class="global-date-bar" id="global-date-bar">
+    <span class="global-date-label">📅 Date Filter:</span>
+    <input type="text" class="global-date-input" id="global-date-input" placeholder="Select a date..." readonly />
+    <button class="global-date-clear" id="global-date-clear" onclick="clearGlobalDate()">✕ Clear</button>
+    <span class="global-date-badge" id="global-date-badge"></span>
+  </div>
+
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="page-header">
+        <div><div class="page-title">Overview</div><div class="page-sub" id="overview-daterange">Loading...</div></div>
+        <div class="filters">
+          <select class="filter-select" id="overview-agent-filter" onchange="loadOverview()">
+            <option value="">All Agents</option>
+          </select>
+        </div>
+      </div>
+      <div class="kpi-grid" id="kpi-grid"><div class="loading">Loading...</div></div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Score Distribution</div><div class="chart-wrap"><canvas id="chart-dist"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Call Status Breakdown</div><div class="chart-wrap"><canvas id="chart-status"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- AGENTS -->
+    <div class="page" id="page-agents">
+      <div class="page-header">
+        <div><div class="page-title">Agent Performance</div><div class="page-sub">Comparative analysis across all agents</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Avg Score by Agent</div><div class="chart-wrap"><canvas id="chart-agent-score"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Call Volume by Agent</div><div class="chart-wrap"><canvas id="chart-agent-volume"></canvas></div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-title">Agent Leaderboard</div>
+        <table>
+          <thead><tr><th>Rank</th><th>Agent</th><th>Calls</th><th>Avg Score</th><th>Error Free</th><th>Deficient</th><th>Avg Duration</th><th>Coaching</th><th></th></tr></thead>
+          <tbody id="agent-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PARAMS -->
+    <div class="page" id="page-params">
+      <div class="page-header">
+        <div><div class="page-title">Parameter Analysis</div><div class="page-sub">Where agents are failing most</div></div>
+        <div class="filters">
+          <select class="filter-select" id="param-agent-filter" onchange="loadParams()">
+            <option value="">All Agents</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-title">Failure Rate by Parameter (% calls scored 0)</div>
+        <div id="params-bars" style="padding: 8px 0;"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top Failing Parameters</div>
+        <div class="chart-wrap" style="height:300px;"><canvas id="chart-params"></canvas></div>
+      </div>
+    </div>
+
+    <!-- TREND -->
+    <div class="page" id="page-trend">
+      <div class="page-header">
+        <div><div class="page-title">Score Trends</div><div class="page-sub">Daily performance over time</div></div>
+        <div class="filters">
+          <select class="filter-select" id="trend-agent-filter" onchange="loadTrend()">
+            <option value="">All Agents</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-bottom:24px;">
+        <div class="chart-title">Daily Average Score</div>
+        <div class="chart-wrap" style="height:280px;"><canvas id="chart-trend"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Daily Call Volume</div>
+        <div class="chart-wrap" style="height:200px;"><canvas id="chart-volume"></canvas></div>
+      </div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="page" id="page-insights">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Signal Intelligence & Insights</div>
+          <div class="page-sub">AI-extracted analysis from call transcriptions</div>
+        </div>
+        <div class="filters">
+          <button class="process-btn" onclick="triggerInsightProcessing()">⚙ Process Transcripts</button>
+          <span class="insights-status" id="insights-process-status"></span>
+        </div>
+      </div>
+
+      <!-- Summary KPIs -->
+      <div class="insights-section">
+        <div class="section-title">Overview</div>
+        <div class="kpi-grid" id="insights-kpi-grid"><div class="loading">Loading insights...</div></div>
+      </div>
+
+      <!-- Signal Intelligence -->
+      <div class="insights-section">
+        <div class="section-title">Signal Intelligence</div>
+        <div class="kpi-grid-6" id="signals-grid"><div class="loading" style="grid-column:1/-1;">Loading...</div></div>
+      </div>
+
+      <!-- Signal Flagged Calls Table -->
+      <div class="insights-section">
+        <div class="table-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div class="table-title" style="margin-bottom:0;">Flagged Calls</div>
+            <div style="display:flex;gap:8px;">
+              <select class="filter-select" id="signal-type-filter" onchange="loadSignals()">
+                <option value="">All Signals</option>
+                <option value="threat">Threats</option>
+                <option value="social">Social Media</option>
+                <option value="escalation">Escalations</option>
+                <option value="regulatory">Regulatory</option>
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Call Ref</th><th>Agent</th><th>Date</th><th>Category</th><th>Flags</th><th>Sentiment</th><th>Details</th></tr></thead>
+            <tbody id="signals-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Call Classification + Sentiment row -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Call Classification</div>
+          <div class="chart-wrap"><canvas id="chart-categories"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Customer Sentiment Distribution</div>
+          <div class="chart-wrap"><canvas id="chart-sentiment-dist"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Call Outcomes -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Call Outcomes</div>
+          <div class="chart-wrap"><canvas id="chart-outcomes"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Talk Time Distribution</div>
+          <div class="chart-wrap"><canvas id="chart-talktime"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Top Complaints + Key Moments -->
+      <div class="charts-row">
+        <div class="chart-card" style="overflow:auto;max-height:420px;">
+          <div class="chart-title">Top Complaints</div>
+          <div id="complaints-list"><div class="loading">Loading...</div></div>
+        </div>
+        <div class="chart-card" style="overflow:auto;max-height:420px;">
+          <div class="chart-title">Key Moment Types</div>
+          <div id="moments-list"><div class="loading">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- Sentiment by Agent -->
+      <div class="insights-section">
+        <div class="table-card">
+          <div class="table-title">Sentiment by Agent</div>
+          <div id="sentiment-agent-bars"><div class="loading">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- Location + Product Mentions -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Location Mentions</div>
+          <div class="chart-wrap"><canvas id="chart-locations"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Product / SKU Mentions</div>
+          <div class="chart-wrap"><canvas id="chart-products"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERT SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div><div class="page-title">Alert Settings</div><div class="page-sub">Get notified by email when threat or escalation calls are detected</div></div>
+      </div>
+      <div class="table-card" style="max-width:600px;">
+        <div class="table-title">Email Notifications</div>
+
+        <div style="margin-bottom:20px;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;">
+            <input type="checkbox" id="alerts-enabled" style="width:16px;height:16px;accent-color:var(--purple);" onchange="alertsFormChanged()">
+            <span>Enable alert emails after each batch is processed</span>
+          </label>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;margin-bottom:6px;">Alert Email Address(es)</div>
+          <input type="text" id="alert-email" placeholder="manager@company.com, director@company.com"
+            style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;"
+            oninput="alertsFormChanged()" />
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Separate multiple addresses with commas</div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;margin-bottom:10px;">Alert On</div>
+          <div style="display:flex;gap:12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--border2);border-radius:8px;font-size:13px;">
+              <input type="checkbox" id="signal-threat" value="threat" style="accent-color:var(--red);" onchange="alertsFormChanged()">
+              <span>⚠️ Threat calls</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--border2);border-radius:8px;font-size:13px;">
+              <input type="checkbox" id="signal-escalation" value="escalation" style="accent-color:var(--amber);" onchange="alertsFormChanged()">
+              <span>🔺 Escalation calls</span>
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button class="btn-primary" style="width:auto;padding:10px 24px;" onclick="saveAlertSettings()">Save Settings</button>
+          <button class="process-btn" onclick="testAlertEmail()">Send Test Email</button>
+          <span id="alert-save-status" style="font-size:12px;color:var(--muted);"></span>
+        </div>
+      </div>
+
+      <div class="table-card" style="max-width:600px;margin-top:20px;">
+        <div class="table-title">How It Works</div>
+        <div style="font-size:13px;color:var(--label);line-height:1.8;">
+          <div style="margin-bottom:8px;">🔔 <strong>When:</strong> After every batch of calls is processed through AI insights</div>
+          <div style="margin-bottom:8px;">📋 <strong>What:</strong> One email listing all threat and escalation calls from that batch</div>
+          <div style="margin-bottom:8px;">🔗 <strong>Backtrack:</strong> Each call includes agent name, date, flag details, and category — go to Insights → Flagged Calls to view the full transcript</div>
+          <div>📬 <strong>Frequency:</strong> One email per processing run — no duplicate alerts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="page" id="page-chat">
+      <div class="page-header">
+        <div><div class="page-title">AI Chat</div><div class="page-sub">Ask anything about your data</div></div>
+      </div>
+      <div class="gemini-key-note" id="gemini-note" style="display:none;">
+        ⚠️ Gemini API key not configured. Set GEMINI_API_KEY in the server .env to enable AI chat.
+      </div>
+      <div class="chat-wrap">
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-msg bot">
+            <div class="bubble-role">Veyn AI</div>
+            <div class="bubble">Hi! I can answer questions about your call center data. Try asking:<br><br>
+            • "Which agent has the highest score?"<br>
+            • "What are the top failing parameters?"<br>
+            • "How many calls were deficient?"</div>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" placeholder="Ask about your data..." onkeydown="if(event.key==='Enter') sendChat()" />
+          <button class="chat-send" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD -->
+    <div class="page" id="page-upload">
+      <div class="page-header">
+        <div><div class="page-title">Upload Data</div><div class="page-sub">Upload QA evaluation and transcription CSVs</div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-title">New Upload</div>
+        <input type="text" id="batch-name" placeholder="Batch name (e.g. June 2026)" style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;margin-bottom:16px;outline:none;" />
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Call Direction</div>
+        <div class="direction-group">
+          <label class="direction-opt"><input type="radio" name="call-direction" value="inbound" checked> 📞 Inbound</label>
+          <label class="direction-opt"><input type="radio" name="call-direction" value="outbound"> 📤 Outbound</label>
+          <label class="direction-opt"><input type="radio" name="call-direction" value="mixed"> 🔀 Mixed</label>
+        </div>
+        <div class="upload-grid">
+          <div class="file-drop" id="eval-drop" onclick="document.getElementById('eval-file').click()">
+            <div style="font-size:24px;">📋</div>
+            <div style="font-size:13px;font-weight:600;margin-top:8px;">Evaluation CSV</div>
+            <div class="file-drop-label">Contains SCORE, Status, agent params</div>
+            <div class="file-drop-name" id="eval-file-name"></div>
+            <input type="file" id="eval-file" accept=".csv" onchange="fileSelected('eval')" />
+          </div>
+          <div class="file-drop" id="trans-drop" onclick="document.getElementById('trans-file').click()">
+            <div style="font-size:24px;">🎙️</div>
+            <div style="font-size:13px;font-weight:600;margin-top:8px;">Transcription CSV</div>
+            <div class="file-drop-label">Contains formatted_translation, file_name</div>
+            <div class="file-drop-name" id="trans-file-name"></div>
+            <input type="file" id="trans-file" accept=".csv" onchange="fileSelected('trans')" />
+          </div>
+        </div>
+        <button class="btn-primary" style="width:auto;padding:10px 28px;" onclick="doUpload()">Upload & Process</button>
+        <div id="upload-status" style="margin-top:12px;font-size:13px;color:var(--muted);"></div>
+      </div>
+      <div class="table-card batch-list">
+        <div class="table-title">Upload History</div>
+        <table>
+          <thead><tr><th>Batch Name</th><th>Eval File</th><th>Calls</th><th>Status</th><th>Uploaded</th></tr></thead>
+          <tbody id="batch-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = (window.location.protocol === 'file:' || window.location.hostname === 'localhost') ? 'http://34.27.148.238:4000' : '';
+let TOKEN = localStorage.getItem('veyn_bi_token');
+let USER = JSON.parse(localStorage.getItem('veyn_bi_user') || 'null');
+let chatHistory = [];
+let agentsCache = [];
+let charts = {};
+let globalDate = ''; // YYYY-MM-DD format
+
+// --- GLOBAL DATE FILTER ---
+function dateQS(sep) {
+  // sep = '?' for first param, '&' for additional
+  if (!globalDate) return '';
+  return sep + 'from=' + encodeURIComponent(globalDate) + '&to=' + encodeURIComponent(globalDate + ' 23:59:59');
+}
+
+function initDatePicker() {
+  flatpickr('#global-date-input', {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'D, M j Y',
+    allowInput: false,
+    onChange: function(selectedDates, dateStr) {
+      globalDate = dateStr || '';
+      const clearBtn = document.getElementById('global-date-clear');
+      const badge = document.getElementById('global-date-badge');
+      if (globalDate) {
+        clearBtn.style.display = 'inline';
+        badge.style.display = 'inline';
+        badge.textContent = 'Showing: ' + dateStr;
+        reloadAllPages();
+      } else {
+        clearBtn.style.display = 'none';
+        badge.style.display = 'none';
+      }
+    }
+  });
+}
+
+function clearGlobalDate() {
+  globalDate = '';
+  document.getElementById('global-date-input')._flatpickr.clear();
+  document.getElementById('global-date-clear').style.display = 'none';
+  document.getElementById('global-date-badge').style.display = 'none';
+  reloadAllPages();
+}
+
+function reloadAllPages() {
+  // Reload all pages that are currently rendered
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
+  loadOverview();
+  if (activePage === 'agents')   loadAgents();
+  if (activePage === 'params')   loadParams();
+  if (activePage === 'trend')    loadTrend();
+  if (activePage === 'insights') loadInsights();
+}
+
+// Tenant-scoped login from ?org= URL param
+const _orgSlug = new URLSearchParams(window.location.search).get('org');
+async function initOrgLogin() {
+  if (!_orgSlug) return;
+  try {
+    const res = await fetch(API + '/api/auth/tenant/' + encodeURIComponent(_orgSlug));
+    if (!res.ok) return;
+    const org = await res.json();
+    const badge = document.getElementById('auth-org-badge');
+    badge.textContent = 'Signing in to ' + org.name;
+    badge.style.display = 'block';
+    document.querySelector('.auth-sub').textContent = org.industry ? org.industry.charAt(0).toUpperCase() + org.industry.slice(1) + ' · CX Intelligence' : 'CX Intelligence Platform';
+  } catch(e) { /* ignore */ }
+}
+initOrgLogin();
+
+// --- AUTH ---
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  document.getElementById('auth-err').textContent = '';
+  try {
+    const res = await fetch(API + '/api/auth/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await res.json();
+    if (!res.ok) { document.getElementById('auth-err').textContent = data.error; return; }
+    TOKEN = data.token; USER = data.user;
+    localStorage.setItem('veyn_bi_token', TOKEN);
+    localStorage.setItem('veyn_bi_user', JSON.stringify(USER));
+    initApp();
+  } catch(e) { document.getElementById('auth-err').textContent = 'Connection error: ' + e.message; }
+}
+
+function doLogout() {
+  localStorage.clear();
+  location.reload();
+}
+
+function initApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('global-date-bar').style.display = 'flex';
+  document.getElementById('tenant-name').textContent = USER.tenantName;
+  document.getElementById('tenant-role').textContent = USER.role + ' · ' + (USER.industry || 'generic');
+  document.getElementById('sidebar-org-name').textContent = USER.tenantName;
+  initDatePicker();
+  loadAgentFilters();
+  loadOverview();
+  loadBatches();
+}
+
+// --- NAV ---
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'agents')   loadAgents();
+  if (name === 'params')   loadParams();
+  if (name === 'trend')    loadTrend();
+  if (name === 'insights') loadInsights();
+  if (name === 'upload')   loadBatches();
+  if (name === 'settings') loadAlertSettings();
+}
+
+// --- API HELPER ---
+async function api(path) {
+  try {
+    const res = await fetch(API + path, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    if (!res.ok) {
+      const errText = await res.text();
+      if (errText.includes('reply session initialization conflicted')) {
+        // Clear stored session and force reload to reset state
+        console.warn('Session conflict detected, clearing token and reloading');
+        localStorage.removeItem('veyn_bi_token');
+        localStorage.removeItem('veyn_bi_user');
+        location.reload();
+        return; // Should not reach here
+      }
+      throw new Error(errText);
+    }
+    return res.json();
+  } catch (e) {
+    console.error('API error:', e);
+    throw e;
+  }
+}
+
+// --- AGENT FILTERS ---
+async function loadAgentFilters() {
+  try {
+    agentsCache = await api('/api/analytics/agents');
+    ['overview-agent-filter','param-agent-filter','trend-agent-filter'].forEach(id => {
+      const sel = document.getElementById(id);
+      agentsCache.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.agent_name; opt.textContent = a.agent_name;
+        sel.appendChild(opt);
+      });
+    });
+  } catch(e) { console.error(e); }
+}
+
+// --- OVERVIEW ---
+async function loadOverview() {
+  const agent = document.getElementById('overview-agent-filter').value;
+  try {
+    const agentParam = agent ? 'agent='+encodeURIComponent(agent) : '';
+    const base = agentParam ? '?' + agentParam + (globalDate ? '&' : '') : '?';
+    const datePart = dateQS(agentParam ? '&' : '?').replace(/^[?&]/, '');
+    const qs = (agentParam || datePart) ? '?' + [agentParam, datePart].filter(Boolean).join('&') : '';
+    const s = await api('/api/analytics/summary' + qs);
+    const dist = await api('/api/analytics/distribution' + qs);
+
+    document.getElementById('overview-daterange').textContent =
+      s.date_from ? new Date(s.date_from).toLocaleDateString('en-GB') + ' – ' + new Date(s.date_to).toLocaleDateString('en-GB') : 'No data';
+
+    const ef_pct = s.total_calls > 0 ? Math.round(s.error_free / s.total_calls * 100) : 0;
+    const score = parseFloat(s.avg_score) || 0;
+    const scoreColor = score >= 90 ? 'kpi-green' : score >= 75 ? 'kpi-amber' : 'kpi-red';
+    const scoreBorderClass = score >= 90 ? 'kpi-card-green' : score >= 75 ? 'kpi-card-amber' : 'kpi-card-red';
+
+    document.getElementById('kpi-grid').innerHTML = `
+      <div class="kpi-card kpi-card-purple"><div class="kpi-label">Total Calls</div><div class="kpi-value kpi-purple">${s.total_calls}</div><div class="kpi-sub">${s.with_transcript} with transcript</div></div>
+      <div class="kpi-card ${scoreBorderClass}"><div class="kpi-label">Avg Score</div><div class="kpi-value ${scoreColor}">${score.toFixed(1)}</div><div class="kpi-sub">out of 100</div></div>
+      <div class="kpi-card kpi-card-green"><div class="kpi-label">Error Free</div><div class="kpi-value kpi-green">${s.error_free}</div><div class="kpi-sub">${ef_pct}% of calls</div></div>
+      <div class="kpi-card kpi-card-red"><div class="kpi-label">Deficient</div><div class="kpi-value kpi-red">${s.deficient}</div><div class="kpi-sub">${100-ef_pct}% of calls</div></div>
+    `;
+
+    // Score distribution chart
+    const bands = ['Below 60','60-69','70-79','80-89','90-99','100'];
+    const distMap = {}; dist.forEach(d => distMap[d.band] = parseInt(d.count));
+    const distData = bands.map(b => distMap[b] || 0);
+    renderChart('chart-dist', 'bar', bands, distData, ['#EF4444','#F97316','#F59E0B','#3B82F6','#10B981','#7C3AED'], false);
+
+    // Status donut
+    renderChart('chart-status', 'doughnut',
+      ['Error Free', 'Deficient'],
+      [parseInt(s.error_free), parseInt(s.deficient)],
+      ['#10B981','#EF4444'], true);
+
+  } catch(e) { console.error(e); }
+}
+
+// --- AGENTS ---
+async function loadAgents() {
+  try {
+    const agents = await api('/api/analytics/agents' + dateQS('?'));
+    const names = agents.map(a => a.agent_name);
+    const scores = agents.map(a => parseFloat(a.avg_score));
+    const volumes = agents.map(a => parseInt(a.total_calls));
+
+    renderChart('chart-agent-score', 'bar', names, scores, '#A78BFA', false, { min: 60 });
+    renderChart('chart-agent-volume', 'bar', names, volumes, '#3B82F6', false);
+
+    document.getElementById('agent-table').innerHTML = agents.map((a, i) => {
+      const score = parseFloat(a.avg_score);
+      const cls = score >= 90 ? 'score-high' : score >= 75 ? 'score-mid' : 'score-low';
+      const agentEnc = encodeURIComponent(a.agent_name);
+      const agentEsc = a.agent_name.replace(/'/g, "\\'");
+      return `<tr class="signal-table-row" onclick="toggleCoaching('coaching-${i}', this)">
+        <td style="color:var(--muted);font-family:'DM Mono',monospace;">#${i+1}</td>
+        <td style="font-weight:600;">${a.agent_name}</td>
+        <td>${a.total_calls}</td>
+        <td><span class="score-pill ${cls}">${score.toFixed(1)}</span></td>
+        <td style="color:var(--green);">${a.error_free}</td>
+        <td style="color:var(--red);">${a.deficient}</td>
+        <td>${a.avg_duration_min} min</td>
+        <td style="font-size:11px;color:var(--muted);">Click to expand ▾</td>
+        <td onclick="event.stopPropagation()"><button class="btn-delete" onclick="confirmDeleteAgent('${agentEsc}')">Delete</button></td>
+      </tr>
+      <tr class="coaching-row"><td colspan="9">
+        <div class="coaching-panel" id="coaching-${i}">
+          <div style="color:var(--muted);font-size:12px;">Loading coaching data...</div>
+        </div>
+      </td></tr>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function toggleCoaching(panelId, row) {
+  const panel = document.getElementById(panelId);
+  const isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.coaching-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.signal-table-row.expanded').forEach(r => r.classList.remove('expanded'));
+  if (!isOpen) {
+    panel.classList.add('open');
+    row.classList.add('expanded');
+    // Load coaching data if not yet loaded
+    if (panel.dataset.loaded) return;
+    panel.dataset.loaded = '1';
+    // Get agent name from row
+    const agentName = row.cells[1].textContent.trim();
+    try {
+      const data = await api('/api/analytics/agents/' + encodeURIComponent(agentName) + '/coaching');
+      renderCoachingPanel(panel, data);
+    } catch(e) {
+      panel.innerHTML = `<div style="color:var(--red);font-size:12px;">Error loading coaching data</div>`;
+    }
+  }
+}
+
+function renderCoachingPanel(panel, data) {
+  if (!data.params || !data.params.length) {
+    panel.innerHTML = `<div style="color:var(--muted);font-size:12px;">No parameter data available for this agent.</div>`;
+    return;
+  }
+  const failingParams = data.params.filter(p => parseFloat(p.zero_pct) > 0).slice(0, 8);
+  if (!failingParams.length) {
+    panel.innerHTML = `<div style="color:var(--green);font-size:12px;">✓ No failing parameters — this agent is scoring on all parameters.</div>`;
+    return;
+  }
+  const barsHtml = failingParams.map(p => {
+    const pct = parseFloat(p.zero_pct);
+    const color = pct > 30 ? '#EF4444' : pct > 15 ? '#F59E0B' : '#F97316';
+    return `<div class="coaching-param-row">
+      <div class="coaching-param-name" title="${p.param_name}">${p.param_name}</div>
+      <div class="coaching-param-bar-wrap"><div class="coaching-param-bar" style="width:${pct}%;background:${color};"></div></div>
+      <div class="coaching-param-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  let samplesHtml = '';
+  if (data.sampleCalls && data.sampleCalls.length) {
+    const refs = data.sampleCalls.map(c => `<span>${c.call_ref || c.call_date}</span>`).join(', ');
+    samplesHtml = `<div class="coaching-sample">Failing calls (worst param): ${refs}</div>`;
+  }
+
+  panel.innerHTML = `
+    <h4>Coaching Focus — Failing Parameters</h4>
+    ${barsHtml}
+    ${samplesHtml}
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;">${data.params.length} parameters total · ${failingParams.length} need attention</div>
+  `;
+}
+
+// --- DELETE AGENT ---
+let _pendingDeleteAgent = null;
+function confirmDeleteAgent(agentName) {
+  _pendingDeleteAgent = agentName;
+  document.getElementById('delete-modal-body').textContent =
+    `This will permanently delete ALL calls, scores, transcripts, and insights for agent "${agentName}". This cannot be undone.`;
+  document.getElementById('delete-modal').classList.add('open');
+  document.getElementById('delete-modal-confirm').onclick = executeDeleteAgent;
+}
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.remove('open');
+  _pendingDeleteAgent = null;
+}
+async function executeDeleteAgent() {
+  if (!_pendingDeleteAgent) return;
+  const agentName = _pendingDeleteAgent;
+  closeDeleteModal();
+  try {
+    const res = await fetch(API + '/api/analytics/agents/' + encodeURIComponent(agentName), {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    alert(`Deleted: ${data.message}`);
+    loadAgents();
+    loadOverview();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// --- PARAMS ---
+async function loadParams() {
+  const agent = document.getElementById('param-agent-filter').value;
+  try {
+    const agentParam = agent ? 'agent='+encodeURIComponent(agent) : '';
+    const datePart = dateQS(agentParam ? '&' : '?').replace(/^[?&]/, '');
+    const qs = (agentParam || datePart) ? '?' + [agentParam, datePart].filter(Boolean).join('&') : '';
+    const params = await api('/api/analytics/params' + qs);
+
+    const barsHtml = params.map(p => {
+      const pct = parseFloat(p.zero_pct);
+      const color = pct > 30 ? '#EF4444' : pct > 15 ? '#F59E0B' : '#10B981';
+      return `<div class="param-row">
+        <div class="param-name" title="${p.param_name}">${p.param_name}</div>
+        <div class="param-bar-wrap"><div class="param-bar" style="width:${pct}%;background:${color};"></div></div>
+        <div class="param-pct">${pct}%</div>
+      </div>`;
+    }).join('');
+    document.getElementById('params-bars').innerHTML = barsHtml;
+
+    const top10 = params.slice(0, 10);
+    renderChart('chart-params', 'bar',
+      top10.map(p => p.param_name.length > 20 ? p.param_name.slice(0,20)+'…' : p.param_name),
+      top10.map(p => parseFloat(p.zero_pct)),
+      top10.map(p => parseFloat(p.zero_pct) > 30 ? '#EF4444' : parseFloat(p.zero_pct) > 15 ? '#F59E0B' : '#10B981'),
+      false, {}, true);
+  } catch(e) { console.error(e); }
+}
+
+// --- TREND ---
+async function loadTrend() {
+  const agent = document.getElementById('trend-agent-filter').value;
+  try {
+    const agentParam = agent ? 'agent='+encodeURIComponent(agent) : '';
+    const datePart = dateQS(agentParam ? '&' : '?').replace(/^[?&]/, '');
+    const qs = (agentParam || datePart) ? '?' + [agentParam, datePart].filter(Boolean).join('&') : '';
+    const trend = await api('/api/analytics/trend' + qs);
+    const labels = trend.map(t => new Date(t.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+    const scores = trend.map(t => parseFloat(t.avg_score));
+    const volumes = trend.map(t => parseInt(t.total_calls));
+
+    renderLineChart('chart-trend', labels, scores);
+    renderChart('chart-volume', 'bar', labels, volumes, '#3B82F6', false);
+  } catch(e) { console.error(e); }
+}
+
+// --- CHAT ---
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  appendChatMsg('user', msg);
+  chatHistory.push({role:'user', content: msg});
+
+  const typing = document.createElement('div');
+  typing.className = 'typing'; typing.textContent = 'Thinking...';
+  document.getElementById('chat-messages').appendChild(typing);
+
+  try {
+    const res = await fetch(API + '/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+      body: JSON.stringify({message: msg, history: chatHistory.slice(-6)})
+    });
+    const data = await res.json();
+    typing.remove();
+    if (data.error && data.error.includes('not configured')) {
+      document.getElementById('gemini-note').style.display = 'block';
+      appendChatMsg('bot', 'Gemini API key not configured on the server. Add GEMINI_API_KEY to .env and restart.');
+    } else {
+      appendChatMsg('bot', data.reply || data.error);
+      chatHistory.push({role:'model', content: data.reply});
+    }
+  } catch(e) { typing.remove(); appendChatMsg('bot', 'Error: ' + e.message); }
+}
+
+function appendChatMsg(role, text) {
+  const el = document.createElement('div');
+  el.className = 'chat-msg ' + role;
+  el.innerHTML = `<div class="bubble-role">${role === 'user' ? 'You' : 'Veyn AI'}</div><div class="bubble">${text.replace(/\n/g,'<br>')}</div>`;
+  const msgs = document.getElementById('chat-messages');
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// --- UPLOAD ---
+function fileSelected(type) {
+  const file = document.getElementById(type + '-file').files[0];
+  if (!file) return;
+  document.getElementById(type + '-file-name').textContent = file.name;
+  document.getElementById(type + '-drop').classList.add('has-file');
+}
+
+async function doUpload() {
+  const evalFile = document.getElementById('eval-file').files[0];
+  const transFile = document.getElementById('trans-file').files[0];
+  const batchName = document.getElementById('batch-name').value || 'Upload ' + new Date().toLocaleDateString();
+  const direction = document.querySelector('input[name="call-direction"]:checked')?.value || 'inbound';
+  const status = document.getElementById('upload-status');
+
+  if (!evalFile) { status.textContent = 'Please select an eval CSV file.'; status.style.color='var(--red)'; return; }
+
+  const fd = new FormData();
+  fd.append('batchName', batchName);
+  fd.append('direction', direction);
+  fd.append('eval', evalFile);
+  if (transFile) fd.append('trans', transFile);
+
+  status.textContent = 'Uploading...'; status.style.color = 'var(--muted)';
+  try {
+    const res = await fetch(API + '/api/upload', {
+      method: 'POST', headers: {'Authorization':'Bearer '+TOKEN}, body: fd
+    });
+    const data = await res.json();
+    status.textContent = data.message + ' Batch ID: ' + data.batchId;
+    status.style.color = 'var(--green)';
+    // Cache-bust: reset agent filter dropdowns and reload fresh data
+    agentsCache = [];
+    ['overview-agent-filter','param-agent-filter','trend-agent-filter'].forEach(id => {
+      const sel = document.getElementById(id);
+      while (sel.options.length > 1) sel.remove(1); // keep "All Agents"
+    });
+    setTimeout(() => { loadAgentFilters(); loadOverview(); loadBatches(); }, 3000);
+    setTimeout(loadBatches, 8000);
+  } catch(e) { status.textContent = 'Error: ' + e.message; status.style.color = 'var(--red)'; }
+}
+
+async function loadBatches() {
+  try {
+    const batches = await api('/api/upload/batches');
+    document.getElementById('batch-table').innerHTML = batches.map(b => {
+      const cls = b.status === 'done' ? 'kpi-green' : b.status === 'error' ? 'kpi-red' : 'kpi-amber';
+      return `<tr>
+        <td style="font-weight:500;">${b.batch_name}</td>
+        <td style="color:var(--muted);font-size:12px;">${b.eval_filename || '—'}</td>
+        <td>${b.total_calls}</td>
+        <td><span class="${cls}">${b.status}</span></td>
+        <td style="color:var(--muted);font-size:12px;">${new Date(b.created_at).toLocaleString()}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px;">No uploads yet</td></tr>';
+  } catch(e) { console.error(e); }
+}
+
+// --- INSIGHTS ---
+async function loadInsights() {
+  try {
+    const dqs = dateQS('?');
+    const damp = dateQS('&');
+    const [summary, categories, signals, complaints, moments, sentByAgent, locations, products] = await Promise.all([
+      api('/api/insights/summary' + dqs).catch(() => null),
+      api('/api/insights/categories' + dqs).catch(() => []),
+      api('/api/insights/signals' + dqs).catch(() => []),
+      api('/api/insights/complaints?limit=15' + damp).catch(() => []),
+      api('/api/insights/moments' + dqs).catch(() => []),
+      api('/api/insights/sentiment-by-agent' + dqs).catch(() => []),
+      api('/api/insights/locations' + dqs).catch(() => []),
+      api('/api/insights/products' + dqs).catch(() => []),
+    ]);
+
+    renderInsightKPIs(summary);
+    renderSignalsGrid(summary);
+    renderSignalsTable(signals);
+    renderCategoriesChart(categories);
+    renderSentimentDist(summary);
+    renderOutcomesChart(summary);
+    renderTalkTimeChart(summary);
+    renderComplaintsList(complaints);
+    renderMomentsList(moments);
+    renderSentimentByAgent(sentByAgent);
+    renderLocationsChart(locations);
+    renderProductsChart(products);
+  } catch(e) {
+    document.getElementById('insights-kpi-grid').innerHTML = `<div class="loading" style="color:var(--amber);">No insights yet — upload transcripts and click "Process Transcripts".</div>`;
+  }
+}
+
+async function loadSignals() {
+  const type = document.getElementById('signal-type-filter')?.value || '';
+  const params = new URLSearchParams();
+  if (type) params.append('type', type);
+  if (globalDate) {
+    params.append('from', globalDate);
+    params.append('to', globalDate + ' 23:59:59');
+  }
+  const qs = params.toString() ? '?' + params.toString() : '';
+  try {
+    const signals = await api('/api/insights/signals' + qs);
+    renderSignalsTable(signals);
+  } catch(e) { console.error(e); }
+}
+
+
+function renderInsightKPIs(s) {
+  if (!s || !s.total_analysed) {
+    document.getElementById('insights-kpi-grid').innerHTML = `<div class="loading" style="grid-column:1/-1;color:var(--amber);">No analysed calls yet. Upload transcripts and click ⚙ Process Transcripts.</div>`;
+    return;
+  }
+  const resRate = s.total_analysed > 0 ? Math.round(s.resolved_calls / s.total_analysed * 100) : 0;
+  const sentScore = parseFloat(s.avg_customer_sentiment) || 0;
+  const sentColor = sentScore > 0.2 ? 'kpi-green' : sentScore < -0.2 ? 'kpi-red' : 'kpi-amber';
+  document.getElementById('insights-kpi-grid').innerHTML = `
+    <div class="kpi-card kpi-card-purple"><div class="kpi-label">Analysed Calls</div><div class="kpi-value kpi-purple">${s.total_analysed}</div><div class="kpi-sub">${s.success_count} successful</div></div>
+    <div class="kpi-card kpi-card-amber"><div class="kpi-label">Avg Customer Sentiment</div><div class="kpi-value ${sentColor}">${sentScore > 0 ? '+' : ''}${sentScore}</div><div class="kpi-sub">−1 (negative) to +1 (positive)</div></div>
+    <div class="kpi-card ${resRate >= 70 ? 'kpi-card-green' : resRate >= 40 ? 'kpi-card-amber' : 'kpi-card-red'}"><div class="kpi-label">Resolution Rate</div><div class="kpi-value ${resRate >= 70 ? 'kpi-green' : resRate >= 40 ? 'kpi-amber' : 'kpi-red'}">${resRate}%</div><div class="kpi-sub">${s.resolved_calls} resolved</div></div>
+    <div class="kpi-card kpi-card-purple"><div class="kpi-label">Avg Customer Talk</div><div class="kpi-value kpi-purple">${s.avg_customer_talk_pct || '—'}%</div><div class="kpi-sub">Agent ${s.avg_agent_talk_pct || '—'}%</div></div>
+  `;
+}
+
+function renderSignalsGrid(s) {
+  if (!s) { document.getElementById('signals-grid').innerHTML = ''; return; }
+  document.getElementById('signals-grid').innerHTML = `
+    <div class="signal-card ${parseInt(s.threat_calls) > 0 ? 'alert' : ''}">
+      <div class="signal-icon">⚠️</div>
+      <div class="signal-count" style="color:var(--red);">${s.threat_calls || 0}</div>
+      <div class="signal-label">Threats</div>
+    </div>
+    <div class="signal-card ${parseInt(s.social_media_calls) > 0 ? 'warn' : ''}">
+      <div class="signal-icon">📱</div>
+      <div class="signal-count" style="color:var(--blue);">${s.social_media_calls || 0}</div>
+      <div class="signal-label">Social Media</div>
+    </div>
+    <div class="signal-card ${parseInt(s.escalation_calls) > 0 ? 'warn' : ''}">
+      <div class="signal-icon">🔺</div>
+      <div class="signal-count" style="color:var(--amber);">${s.escalation_calls || 0}</div>
+      <div class="signal-label">Escalations</div>
+    </div>
+    <div class="signal-card ${parseInt(s.regulatory_calls) > 0 ? 'warn' : ''}">
+      <div class="signal-icon">⚖️</div>
+      <div class="signal-count" style="color:var(--purple-soft);">${s.regulatory_calls || 0}</div>
+      <div class="signal-label">Regulatory</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">😠</div>
+      <div class="signal-count" style="color:var(--red);">${s.negative_calls || 0}</div>
+      <div class="signal-label">Negative Calls</div>
+    </div>
+    <div class="signal-card">
+      <div class="signal-icon">😊</div>
+      <div class="signal-count" style="color:var(--green);">${s.positive_calls || 0}</div>
+      <div class="signal-label">Positive Calls</div>
+    </div>
+  `;
+}
+
+function renderSignalsTable(signals) {
+  const tbody = document.getElementById('signals-table');
+  // Clear all previously rendered panels so stale data-loaded flags are gone
+  tbody.innerHTML = '';
+  if (!signals.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">No flagged calls found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = signals.map((r, i) => {
+    const flags = [
+      r.threat_detected ? `<span class="flag-pill flag-threat">⚠ Threat</span>` : '',
+      r.social_media_mention ? `<span class="flag-pill flag-social">📱 Social</span>` : '',
+      r.escalation_request ? `<span class="flag-pill flag-escalation">🔺 Escalation</span>` : '',
+      r.regulatory_mention ? `<span class="flag-pill flag-regulatory">⚖ Regulatory</span>` : '',
+    ].filter(Boolean).join('');
+    const sentColor = r.customer_sentiment_overall === 'Negative' ? 'var(--red)' : r.customer_sentiment_overall === 'Positive' ? 'var(--green)' : 'var(--amber)';
+
+    // Build reasoning panel content
+    const flagDetails = [
+      r.threat_detected && r.threat_details ? { label: '⚠ Threat', cls: 'var(--red)', detail: r.threat_details } : null,
+      r.social_media_mention && r.social_media_details ? { label: '📱 Social', cls: 'var(--blue)', detail: r.social_media_details } : null,
+      r.escalation_request && r.escalation_details ? { label: '🔺 Escalation', cls: 'var(--amber)', detail: r.escalation_details } : null,
+      r.regulatory_mention && r.regulatory_details ? { label: '⚖ Regulatory', cls: 'var(--purple-soft)', detail: r.regulatory_details } : null,
+    ].filter(Boolean);
+
+    let moments = [];
+    try { moments = typeof r.key_moments === 'string' ? JSON.parse(r.key_moments) : (r.key_moments || []); } catch(e) {}
+
+    const momentTypeClass = t => {
+      if (!t) return 'moment-default';
+      t = t.toLowerCase();
+      if (t.includes('escalat')) return 'moment-escalation';
+      if (t.includes('resolut')) return 'moment-resolution';
+      if (t.includes('complaint')) return 'moment-complaint';
+      if (t.includes('positive')) return 'moment-positive';
+      return 'moment-default';
+    };
+
+    const reasoningHtml = `
+      <div class="reasoning-panel" id="reasoning-${i}" data-callid="${r.call_id}">
+        ${r.summary ? `<h4>Summary</h4><div class="reasoning-summary">${r.summary}</div>` : ''}
+        ${flagDetails.length ? `
+          <h4>Why This Call Was Flagged</h4>
+          <div class="reasoning-flags">
+            ${flagDetails.map(f => `
+              <div class="reasoning-flag-item">
+                <span class="reasoning-flag-label" style="color:${f.cls};">${f.label}</span>
+                <span class="reasoning-flag-detail">${f.detail}</span>
+              </div>`).join('')}
+          </div>` : ''}
+        ${moments.length ? `
+          <h4>Key Moments</h4>
+          <div class="reasoning-moments">
+            ${moments.map(m => `
+              <div class="reasoning-moment">
+                <span class="reasoning-moment-type ${momentTypeClass(m.type)}">${m.type || 'Event'}</span>
+                <span class="reasoning-moment-desc">${m.description || ''}</span>
+                <span class="reasoning-moment-ts">${m.timestamp || ''}</span>
+              </div>`).join('')}
+          </div>` : ''}
+        <div style="margin-top:12px;font-size:11px;color:var(--muted);">Outcome: <strong style="color:var(--label);">${r.call_outcome || '—'}</strong> &nbsp;|&nbsp; Category: <strong style="color:var(--label);">${r.call_category || '—'}</strong></div>
+        <h4>Transcript</h4>
+        <div class="transcript-block" id="transcript-${i}">Loading transcript...</div>
+        <div class="audit-meta" id="audit-${i}">Loading metadata...</div>
+      </div>`;
+
+    return `<tr class="signal-table-row" onclick="toggleReasoning(${i}, this)">
+      <td style="font-family:'DM Mono',monospace;font-size:12px;">${r.call_ref || r.call_id}</td>
+      <td>${r.agent_name || '—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${r.call_date ? new Date(r.call_date).toLocaleDateString('en-GB') : '—'}</td>
+      <td style="font-size:12px;">${r.call_category || '—'}</td>
+      <td>${flags || '<span style="color:var(--muted);font-size:12px;">None</span>'}</td>
+      <td style="color:${sentColor};font-size:12px;">${r.customer_sentiment_overall || '—'}</td>
+      <td style="font-size:12px;color:var(--muted);">Click to expand ▾</td>
+    </tr>
+    <tr class="reasoning-row"><td colspan="7">${reasoningHtml}</td></tr>`;
+  }).join('');
+}
+
+async function toggleReasoning(i, row) {
+  const panel = document.getElementById('reasoning-' + i);
+  const isOpen = panel.classList.contains('open');
+  // Close all open panels
+  document.querySelectorAll('.reasoning-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.signal-table-row.expanded').forEach(r => r.classList.remove('expanded'));
+  if (!isOpen) {
+    panel.classList.add('open');
+    row.classList.add('expanded');
+    // Load full detail (transcript) if not yet loaded
+    if (!panel.dataset.loaded) {
+      panel.dataset.loaded = '1';
+      const callId = panel.dataset.callid;
+      if (callId) {
+        try {
+          const full = await api('/api/insights/call/' + callId + '/full');
+          const transcriptEl = document.getElementById('transcript-' + i);
+          const auditEl = document.getElementById('audit-' + i);
+          if (transcriptEl && full.transcript) {
+            const text = full.transcript.translation_text || full.transcript.transcription_text || '';
+            transcriptEl.textContent = text || '(No transcript text available)';
+          } else if (transcriptEl) {
+            transcriptEl.textContent = '(No transcript attached to this call)';
+          }
+          if (auditEl && full.insight) {
+            const ins = full.insight;
+            auditEl.innerHTML = `Processed: ${ins.processed_at ? new Date(ins.processed_at).toLocaleString() : '—'} &nbsp;|&nbsp; Direction: ${ins.direction || '—'} &nbsp;|&nbsp; Emotions: ${Array.isArray(ins.emotions) ? ins.emotions.join(', ') : (ins.emotions || '—')}`;
+          }
+        } catch(e) {
+          console.warn('Could not load full detail:', e.message);
+        }
+      }
+    }
+  }
+}
+
+function renderCategoriesChart(categories) {
+  const grouped = {};
+  categories.forEach(c => {
+    grouped[c.call_category] = (grouped[c.call_category] || 0) + parseInt(c.count);
+  });
+  const labels = Object.keys(grouped);
+  const data = labels.map(l => grouped[l]);
+  const colors = ['#7C3AED','#3B82F6','#10B981','#F59E0B','#EF4444','#A78BFA','#06B6D4','#F97316'];
+  renderChart('chart-categories', 'doughnut', labels, data, colors.slice(0, labels.length), true);
+}
+
+function renderSentimentDist(s) {
+  if (!s) return;
+  renderChart('chart-sentiment-dist', 'doughnut',
+    ['Positive', 'Neutral', 'Mixed', 'Negative'],
+    [parseInt(s.positive_calls)||0, parseInt(s.neutral_calls)||0, parseInt(s.mixed_calls)||0, parseInt(s.negative_calls)||0],
+    ['#10B981','#64748B','#F59E0B','#EF4444'], true);
+}
+
+function renderOutcomesChart(s) {
+  if (!s) return;
+  renderChart('chart-outcomes', 'doughnut',
+    ['Resolved', 'Unresolved', 'Escalated'],
+    [parseInt(s.resolved_calls)||0, parseInt(s.unresolved_calls)||0, parseInt(s.escalated_calls)||0],
+    ['#10B981','#EF4444','#F59E0B'], true);
+}
+
+function renderTalkTimeChart(s) {
+  if (!s) return;
+  const custPct = parseFloat(s.avg_customer_talk_pct) || 50;
+  const agentPct = parseFloat(s.avg_agent_talk_pct) || 50;
+  renderChart('chart-talktime', 'doughnut',
+    ['Customer', 'Agent'],
+    [custPct, agentPct],
+    ['#3B82F6','#A78BFA'], true);
+}
+
+function renderComplaintsList(complaints) {
+  const el = document.getElementById('complaints-list');
+  if (!complaints.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0;">No complaints extracted yet</div>'; return; }
+  el.innerHTML = complaints.map((c, i) => `
+    <div class="complaint-item">
+      <span class="complaint-rank">${String(i+1).padStart(2,'0')}</span>
+      <span class="complaint-text">${c.complaint}</span>
+      <span class="complaint-freq">${c.frequency}×</span>
+    </div>
+  `).join('');
+}
+
+function renderMomentsList(moments) {
+  const el = document.getElementById('moments-list');
+  if (!moments.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0;">No moments extracted yet</div>'; return; }
+  el.innerHTML = moments.map(m => {
+    const t = (m.moment_type || '').toLowerCase();
+    const cls = t.includes('escalat') ? 'moment-escalation' : t.includes('resolut') ? 'moment-resolution' : t.includes('complaint') ? 'moment-complaint' : t.includes('positive') ? 'moment-positive' : 'moment-default';
+    const examples = (m.examples || []).slice(0,2).join(' / ');
+    return `<div class="moment-item">
+      <span class="moment-type ${cls}">${m.moment_type}</span>
+      <span class="moment-desc">${examples || '—'}</span>
+      <span class="moment-freq">${m.frequency}×</span>
+    </div>`;
+  }).join('');
+}
+
+function renderSentimentByAgent(agents) {
+  const el = document.getElementById('sentiment-agent-bars');
+  if (!agents.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px;">No data</div>'; return; }
+  // Deduplicate by agent_name (take best avg)
+  const seen = {};
+  agents.forEach(a => { if (!seen[a.agent_name]) seen[a.agent_name] = a; });
+  const deduped = Object.values(seen);
+  el.innerHTML = `<div style="padding:4px 0;">` + deduped.map(a => {
+    const score = parseFloat(a.avg_customer_sentiment) || 0;
+    // Map score -1..1 to 0..100% width, center at 50%
+    const pct = Math.round((score + 1) / 2 * 100);
+    const color = score > 0.2 ? '#10B981' : score < -0.2 ? '#EF4444' : '#F59E0B';
+    return `<div class="sentiment-bar-row">
+      <span class="sentiment-name" title="${a.agent_name}">${a.agent_name}</span>
+      <div class="sentiment-track">
+        <div class="sentiment-fill" style="width:${pct}%;background:${color};"></div>
+      </div>
+      <span class="sentiment-val" style="color:${color};">${score > 0 ? '+' : ''}${score}</span>
+      <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;text-align:right;">${a.escalations} esc / ${a.threats} thr</span>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+function renderLocationsChart(locations) {
+  if (!locations.length) return;
+  const labels = locations.slice(0,10).map(l => l.location);
+  const data = locations.slice(0,10).map(l => parseInt(l.call_count));
+  renderChart('chart-locations', 'bar', labels, data, '#3B82F6', false, {}, true);
+}
+
+function renderProductsChart(products) {
+  if (!products.length) return;
+  const labels = products.slice(0,10).map(p => p.product);
+  const data = products.slice(0,10).map(p => parseInt(p.frequency));
+  renderChart('chart-products', 'bar', labels, data, '#A78BFA', false, {}, true);
+}
+
+async function loadSignals() {
+  const type = document.getElementById('signal-type-filter').value;
+  const dateStr = document.getElementById('signal-date-filter').value;
+  try {
+    const params = new URLSearchParams();
+    if (type) params.append('type', type);
+    if (dateStr) {
+      params.append('from', dateStr);
+      params.append('to', dateStr + ' 23:59:59');
+    }
+    const q = params.toString();
+    const signals = await api('/api/insights/signals' + (q ? '?' + q : ''));
+    renderSignalsTable(signals);
+  } catch(e) { console.error(e); }
+}
+
+async function triggerInsightProcessing() {
+  const statusEl = document.getElementById('insights-process-status');
+  statusEl.textContent = 'Triggering...';
+  statusEl.style.color = 'var(--muted)';
+  try {
+    const res = await fetch(API + '/api/insights/process', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    statusEl.textContent = data.message;
+    statusEl.style.color = 'var(--green)';
+    // Reload after a delay to pick up results
+    setTimeout(() => { statusEl.textContent = 'Refreshing...'; loadInsights(); }, 15000);
+    setTimeout(loadInsights, 30000);
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// --- THEME ---
+function setTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('theme-white');
+    document.getElementById('theme-dark-btn').classList.remove('active');
+    document.getElementById('theme-light-btn').classList.add('active');
+  } else {
+    document.body.classList.remove('theme-white');
+    document.getElementById('theme-dark-btn').classList.add('active');
+    document.getElementById('theme-light-btn').classList.remove('active');
+  }
+  localStorage.setItem('veyn_bi_theme', theme);
+}
+function initTheme() {
+  const saved = localStorage.getItem('veyn_bi_theme') || 'dark';
+  setTheme(saved);
+}
+
+// --- EXPORT DROPDOWN ---
+function toggleExportMenu() {
+  const menu = document.getElementById('export-menu');
+  menu.classList.toggle('open');
+  // Close when clicking outside
+  if (menu.classList.contains('open')) {
+    setTimeout(() => {
+      document.addEventListener('click', function _closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.classList.remove('open');
+          document.removeEventListener('click', _closeMenu);
+        }
+      });
+    }, 0);
+  }
+}
+
+function exportPDF() {
+  document.getElementById('export-menu').classList.remove('open');
+  window.print();
+}
+
+function exportHTML() {
+  document.getElementById('export-menu').classList.remove('open');
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'veyn-report-' + new Date().toISOString().slice(0,10) + '.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function csvEscape(v) {
+  if (v == null) return '';
+  const s = String(v).replace(/"/g, '""');
+  return /[",\n]/.test(s) ? '"' + s + '"' : s;
+}
+function downloadCSV(rows, filename) {
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function exportCSV(type) {
+  document.getElementById('export-menu').classList.remove('open');
+  try {
+    if (type === 'flagged') {
+      const signals = await api('/api/insights/signals');
+      const headers = ['Call Ref','Agent','Date','Category','Flags','Sentiment','Outcome','Summary'];
+      const rows = [headers, ...signals.map(r => [
+        r.call_ref || r.call_id,
+        r.agent_name,
+        r.call_date ? new Date(r.call_date).toLocaleDateString('en-GB') : '',
+        r.call_category,
+        [r.threat_detected?'Threat':'', r.social_media_mention?'Social':'', r.escalation_request?'Escalation':'', r.regulatory_mention?'Regulatory':''].filter(Boolean).join('; '),
+        r.customer_sentiment_overall,
+        r.call_outcome,
+        r.summary
+      ])];
+      downloadCSV(rows, 'flagged-calls-' + new Date().toISOString().slice(0,10) + '.csv');
+
+    } else if (type === 'agents') {
+      const agents = await api('/api/analytics/agents');
+      const headers = ['Rank','Agent','Total Calls','Avg Score','Error Free','Deficient','Avg Duration (min)'];
+      const rows = [headers, ...agents.map((a, i) => [
+        i + 1,
+        a.agent_name,
+        a.total_calls,
+        parseFloat(a.avg_score).toFixed(1),
+        a.error_free,
+        a.deficient,
+        a.avg_duration_min
+      ])];
+      downloadCSV(rows, 'agent-performance-' + new Date().toISOString().slice(0,10) + '.csv');
+
+    } else if (type === 'params') {
+      const agent = document.getElementById('param-agent-filter') ? document.getElementById('param-agent-filter').value : '';
+      const params = await api('/api/analytics/params' + (agent ? '?agent=' + encodeURIComponent(agent) : ''));
+      const headers = ['Parameter','Failure Rate (%)','Calls Scored 0'];
+      const rows = [headers, ...params.map(p => [
+        p.param_name,
+        parseFloat(p.zero_pct).toFixed(1),
+        p.zero_count
+      ])];
+      downloadCSV(rows, 'parameter-analysis-' + new Date().toISOString().slice(0,10) + '.csv');
+    }
+  } catch(e) {
+    alert('Export failed: ' + e.message);
+  }
+}
+
+// --- CHART HELPERS ---
+function renderChart(id, type, labels, data, colors, legend, options = {}, horizontal = false) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, {
+    type,
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: Array.isArray(colors) ? colors : (type === 'bar' ? labels.map(() => colors + 'CC') : colors),
+        borderColor: Array.isArray(colors) ? colors : colors,
+        borderWidth: type === 'bar' ? 0 : 2,
+        borderRadius: type === 'bar' ? 4 : 0,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: horizontal ? 'y' : 'x',
+      plugins: { legend: { display: !!legend, labels: { color: '#94A3B8', font: { size: 12 } } } },
+      scales: type !== 'doughnut' ? {
+        x: { ticks: { color: '#64748B', font: { size: 11 } }, grid: { color: '#243050' } },
+        y: { ticks: { color: '#64748B', font: { size: 11 } }, grid: { color: '#243050' }, min: options.min || 0 }
+      } : {}
+    }
+  });
+}
+
+function renderLineChart(id, labels, data) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#A78BFA',
+        backgroundColor: 'rgba(167,139,250,0.08)',
+        borderWidth: 2,
+        pointBackgroundColor: '#A78BFA',
+        pointRadius: 4,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748B', font: { size: 11 } }, grid: { color: '#243050' } },
+        y: { ticks: { color: '#64748B', font: { size: 11 } }, grid: { color: '#243050' }, min: 60 }
+      }
+    }
+  });
+}
+
+// --- ALERT SETTINGS ---
+async function loadAlertSettings() {
+  try {
+    const data = await api('/api/settings/alerts');
+    document.getElementById('alerts-enabled').checked = !!data.alerts_enabled;
+    document.getElementById('alert-email').value = data.alert_email || '';
+    document.getElementById('signal-threat').checked = (data.alert_signals || []).includes('threat');
+    document.getElementById('signal-escalation').checked = (data.alert_signals || []).includes('escalation');
+  } catch(e) { console.error('Failed to load alert settings:', e.message); }
+}
+
+function alertsFormChanged() {
+  document.getElementById('alert-save-status').textContent = '';
+}
+
+async function saveAlertSettings() {
+  const statusEl = document.getElementById('alert-save-status');
+  const alerts_enabled = document.getElementById('alerts-enabled').checked;
+  const alert_email = document.getElementById('alert-email').value.trim();
+  const signals = [];
+  if (document.getElementById('signal-threat').checked) signals.push('threat');
+  if (document.getElementById('signal-escalation').checked) signals.push('escalation');
+
+  if (alerts_enabled && !alert_email) {
+    statusEl.textContent = 'Please enter at least one email address.';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  try {
+    statusEl.textContent = 'Saving...'; statusEl.style.color = 'var(--muted)';
+    const res = await fetch(API + '/api/settings/alerts', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body: JSON.stringify({ alert_email, alert_signals: signals, alerts_enabled })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    statusEl.textContent = '✓ Saved';
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+async function testAlertEmail() {
+  const statusEl = document.getElementById('alert-save-status');
+  try {
+    statusEl.textContent = 'Sending test...'; statusEl.style.color = 'var(--muted)';
+    const res = await fetch(API + '/api/settings/alerts/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    statusEl.textContent = '✓ ' + data.message;
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// --- INIT ---
+initTheme();
+if (TOKEN && USER) {
+  initApp();
+} else {
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+</script>
+</body>
+</html>

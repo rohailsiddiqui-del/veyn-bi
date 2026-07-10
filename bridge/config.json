@@ -1,0 +1,16 @@
+{
+  "voiceAppHost": "http://10.0.0.24",
+  "evalPort": 8018,
+  "transPort": 8002,
+  "voiceUsername": "aihadmin",
+  "voicePassword": "aih@321",
+  "orgId": 45,
+
+  "gcpApiUrl": "http://34.27.148.238:4000",
+  "gcpEmail": "admin@logoshoes.com",
+  "gcpPassword": "test123",
+
+  "daysBack": 1,
+  "direction": "inbound",
+  "batchPrefix": "Auto"
+}

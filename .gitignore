@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+*.db
+*.sqlite
+*.sqlite3
+data/
+frontend/
+web/.next/
+web/node_modules/
+service-account.json
+*.key
+*.pem

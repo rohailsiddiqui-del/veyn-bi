@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-border: var(--border-color);
+  --color-border2: var(--border2);
+  
+  --color-primary: var(--primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-label: var(--text-label);
+}
+
+@layer base {
+  :root {
+    /* Dark Theme (Default) */
+    --bg: #030712; /* darker bg */
+    --surface: #0B0F19; /* deep surface */
+    --surface2: #111827; /* slightly lighter surface */
+    --border-color: #1F2937;
+    --border2: #374151;
+    
+    --primary: #8B5CF6; /* Violet 500 */
+    --primary-soft: #A78BFA;
+    --success: #10B981; /* Emerald 500 */
+    --warning: #F59E0B; /* Amber 500 */
+    --danger: #EF4444; /* Red 500 */
+    --info: #3B82F6; /* Blue 500 */
+    
+    --text-main: #F9FAFB;
+    --text-muted: #9CA3AF;
+    --text-label: #D1D5DB;
+  }
+
+  .theme-light {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface2: #F1F5F9;
+    --border-color: #E2E8F0;
+    --border2: #CBD5E1;
+    
+    --text-main: #0F172A;
+    --text-muted: #64748B;
+    --text-label: #475569;
+  }
+
+  body {
+    @apply bg-bg text-text-main font-sans antialiased min-h-screen selection:bg-primary/30;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-surface/70 backdrop-blur-xl border border-border rounded-2xl shadow-xl transition-all duration-300;
+  }
+  
+  .glass-panel:hover {
+    @apply shadow-primary/5 border-primary/20 transform -translate-y-[2px];
+  }
+  
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-text-label transition-all duration-200;
+  }
+  
+  .nav-item:hover {
+    @apply bg-surface2 text-text-main;
+  }
+  
+  .nav-item.active {
+    @apply bg-primary/10 text-primary-soft shadow-inner shadow-primary/5;
+  }
+  
+  .btn-primary {
+    @apply w-full bg-gradient-to-r from-primary to-primary-soft text-white border-none rounded-lg py-2.5 px-4 text-sm font-semibold cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98];
+  }
+  
+  .btn-outline {
+    @apply bg-surface2 border border-border2 text-text-label rounded-lg py-2 px-4 text-xs font-semibold cursor-pointer transition-all duration-200 hover:border-primary-soft hover:text-primary-soft;
+  }
+  
+  .input-field {
+    @apply w-full bg-bg border border-border2 rounded-lg py-2.5 px-3.5 text-text-main text-sm outline-none transition-colors duration-200 focus:border-primary focus:ring-1 focus:ring-primary/30;
+  }
+  
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply bg-success/10 text-success border border-success/20;
+  }
+  
+  .badge-warning {
+    @apply bg-warning/10 text-warning border border-warning/20;
+  }
+  
+  .badge-danger {
+    @apply bg-danger/10 text-danger border border-danger/20;
+  }
+  
+  .badge-info {
+    @apply bg-info/10 text-info border border-info/20;
+  }
+  
+  .table-container {
+    @apply w-full border-collapse text-sm;
+  }
+  
+  .table-container th {
+    @apply text-left py-3 px-4 text-text-muted font-medium border-b border-border text-xs uppercase tracking-wider;
+  }
+  
+  .table-container td {
+    @apply py-3 px-4 border-b border-border transition-colors duration-150;
+  }
+  
+  .table-container tr:last-child td {
+    @apply border-b-0;
+  }
+  
+  .table-container tr:hover td {
+    @apply bg-surface2/50;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-border2 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-text-muted;
+}

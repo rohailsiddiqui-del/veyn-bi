@@ -1,0 +1,1 @@
+require('./src/db').query('UPDATE call_insights SET error = NULL WHERE error IS NOT NULL').then(function(r){console.log("Reset " + r.rowCount + " calls");process.exit(0);}).catch(function(e){console.error(e);process.exit(1);})

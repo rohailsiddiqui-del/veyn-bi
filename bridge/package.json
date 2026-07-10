@@ -1,0 +1,14 @@
+{
+  "name": "veyn-bi-bridge",
+  "version": "1.0.0",
+  "description": "Fetches eval + transcription CSVs from Voice App API and pushes to Veyn BI GCP",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "schedule": "node scheduler.js"
+  },
+  "dependencies": {
+    "form-data": "^4.0.0",
+    "node-cron": "^3.0.3"
+  }
+}
