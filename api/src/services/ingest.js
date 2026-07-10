@@ -61,9 +61,12 @@ async function ingestCSVs(tenantId, batchId, evalText, transText, batchDirection
       const callRes = await db.query(
         `INSERT INTO calls
           (tenant_id, batch_id, call_ref, agent_name, call_date, call_duration_seconds, direction, status, score, has_transcript)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (tenant_id, call_ref) DO NOTHING
+         RETURNING id`,
         [tenantId, batchId, callRef, agentName, callDate, duration, direction, status, score, hasTranscript]
       );
+      if (!callRes.rows[0]) continue; // duplicate — skip transcript + param inserts
       const callId = callRes.rows[0].id;
 
       // Param scores
