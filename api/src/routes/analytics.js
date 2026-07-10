@@ -9,8 +9,8 @@ router.get('/summary', async (req, res) => {
   try {
     let where = 'WHERE tenant_id=$1';
     const params = [tenantId];
-    if (from) { params.push(from); where += ` AND call_date >= $${params.length}`; }
-    if (to)   { params.push(to);   where += ` AND call_date <= $${params.length}`; }
+    if (from) { params.push(from); where += ` AND created_at::date >= $${params.length}`; }
+    if (to)   { params.push(to);   where += ` AND created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND batch_id = $${params.length}`; }
 
     const r = await db.query(`
@@ -40,8 +40,8 @@ router.get('/agents', async (req, res) => {
   try {
     let where = 'WHERE tenant_id=$1';
     const params = [tenantId];
-    if (from) { params.push(from); where += ` AND call_date >= $${params.length}`; }
-    if (to)   { params.push(to);   where += ` AND call_date <= $${params.length}`; }
+    if (from) { params.push(from); where += ` AND created_at::date >= $${params.length}`; }
+    if (to)   { params.push(to);   where += ` AND created_at::date <= $${params.length}`; }
 
     const r = await db.query(`
       SELECT
@@ -150,8 +150,8 @@ router.get('/trend', async (req, res) => {
   try {
     let where = 'WHERE tenant_id=$1';
     const params = [tenantId];
-    if (from)  { params.push(from);  where += ` AND call_date >= $${params.length}`; }
-    if (to)    { params.push(to);    where += ` AND call_date <= $${params.length}`; }
+    if (from)  { params.push(from);  where += ` AND created_at::date >= $${params.length}`; }
+    if (to)    { params.push(to);    where += ` AND created_at::date <= $${params.length}`; }
     if (agent) { params.push(agent); where += ` AND agent_name = $${params.length}`; }
 
     const r = await db.query(`
@@ -212,8 +212,8 @@ router.get('/distribution', async (req, res) => {
   try {
     let where = 'WHERE tenant_id=$1';
     const params = [tenantId];
-    if (from) { params.push(from); where += ` AND call_date >= $${params.length}`; }
-    if (to)   { params.push(to);   where += ` AND call_date <= $${params.length}`; }
+    if (from) { params.push(from); where += ` AND created_at::date >= $${params.length}`; }
+    if (to)   { params.push(to);   where += ` AND created_at::date <= $${params.length}`; }
 
     const r = await db.query(`
       SELECT

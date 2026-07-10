@@ -49,8 +49,8 @@ router.get('/all', async (req, res) => {
 
   const params = [tenantId];
   let dateWhere = '';
-  if (from)    { params.push(from);    dateWhere += ` AND c.call_date >= $${params.length}`; }
-  if (to)      { params.push(to);      dateWhere += ` AND c.call_date <= $${params.length}`; }
+  if (from)    { params.push(from);    dateWhere += ` AND c.created_at::date >= $${params.length}`; }
+  if (to)      { params.push(to);      dateWhere += ` AND c.created_at::date <= $${params.length}`; }
   if (batchId) { params.push(batchId); dateWhere += ` AND c.batch_id = $${params.length}`; }
 
   const baseWhere = `WHERE ci.tenant_id=$1${dateWhere}`;
@@ -101,8 +101,8 @@ router.get('/summary', async (req, res) => {
     let where = 'WHERE ci.tenant_id=$1';
     const params = [tenantId];
 
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     const r = await db.query(`
@@ -142,8 +142,8 @@ router.get('/categories', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     const r = await db.query(`
@@ -175,8 +175,8 @@ router.get('/complaints', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1 AND ci.top_complaints != \'[]\'::jsonb';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     // Expand JSONB array and count occurrences
@@ -208,8 +208,8 @@ router.get('/sentiment-by-agent', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     const r = await db.query(`
@@ -244,8 +244,8 @@ router.get('/signals', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     // Filter by signal type
@@ -292,8 +292,8 @@ router.get('/locations', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1 AND ci.location_mentioned IS NOT NULL';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     const r = await db.query(`
@@ -324,8 +324,8 @@ router.get('/products', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1 AND ci.product_mentions != \'[]\'::jsonb';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     const r = await db.query(`
@@ -356,8 +356,8 @@ router.get('/moments', async (req, res) => {
   try {
     let where = 'WHERE ci.tenant_id=$1 AND ci.key_moments != \'[]\'::jsonb';
     const params = [tenantId];
-    if (from)    { params.push(from);    where += ` AND c.call_date >= $${params.length}`; }
-    if (to)      { params.push(to);      where += ` AND c.call_date <= $${params.length}`; }
+    if (from)    { params.push(from);    where += ` AND c.created_at::date >= $${params.length}`; }
+    if (to)      { params.push(to);      where += ` AND c.created_at::date <= $${params.length}`; }
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     const r = await db.query(`
