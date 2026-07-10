@@ -16,6 +16,7 @@ app.use('/api/upload',    auth, require('./routes/upload'));
 app.use('/api/analytics', auth, require('./routes/analytics'));
 app.use('/api/insights',  auth, require('./routes/insights'));
 app.use('/api/chat',      auth, require('./routes/chat'));
+app.use('/api/settings',  auth, require('./routes/settings'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
