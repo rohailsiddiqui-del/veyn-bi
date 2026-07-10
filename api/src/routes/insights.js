@@ -42,6 +42,55 @@ router.post('/process', async (req, res) => {
   }
 });
 
+// Aggregated endpoint — all insights data in one request (fast page load)
+router.get('/all', async (req, res) => {
+  const { tenantId } = req.user;
+  const { from, to, batchId } = req.query;
+
+  const params = [tenantId];
+  let dateWhere = '';
+  if (from)    { params.push(from);    dateWhere += ` AND c.call_date >= $${params.length}`; }
+  if (to)      { params.push(to);      dateWhere += ` AND c.call_date <= $${params.length}`; }
+  if (batchId) { params.push(batchId); dateWhere += ` AND c.batch_id = $${params.length}`; }
+
+  const baseWhere = `WHERE ci.tenant_id=$1${dateWhere}`;
+
+  try {
+    const [summary, categories, signals, complaints, moments, sentimentByAgent, locations, products] =
+      await Promise.all([
+        // summary
+        db.query(`SELECT COUNT(*) AS total_analysed, COUNT(*) FILTER (WHERE ci.error IS NULL) AS success_count, COUNT(*) FILTER (WHERE ci.threat_detected=true) AS threat_calls, COUNT(*) FILTER (WHERE ci.social_media_mention=true) AS social_media_calls, COUNT(*) FILTER (WHERE ci.escalation_request=true) AS escalation_calls, COUNT(*) FILTER (WHERE ci.regulatory_mention=true) AS regulatory_calls, COUNT(*) FILTER (WHERE ci.customer_sentiment_overall='Positive') AS positive_calls, COUNT(*) FILTER (WHERE ci.customer_sentiment_overall='Negative') AS negative_calls, ROUND(AVG(ci.customer_sentiment_score)::numeric,2) AS avg_customer_sentiment, ROUND(AVG(ci.agent_sentiment_score)::numeric,2) AS avg_agent_sentiment, ROUND(AVG(ci.customer_talk_pct)::numeric,1) AS avg_customer_talk_pct, COUNT(*) FILTER (WHERE ci.call_outcome='Resolved') AS resolved_calls FROM call_insights ci JOIN calls c ON c.id=ci.call_id ${baseWhere}`, params),
+        // categories
+        db.query(`SELECT ci.call_category, ci.call_subcategory, COUNT(*) AS count, ROUND(AVG(ci.customer_sentiment_score)::numeric,2) AS avg_sentiment FROM call_insights ci JOIN calls c ON c.id=ci.call_id ${baseWhere} AND ci.call_category IS NOT NULL GROUP BY ci.call_category, ci.call_subcategory ORDER BY count DESC`, params),
+        // signals (flagged calls)
+        db.query(`SELECT c.id AS call_id, c.call_ref, c.agent_name, c.call_date, ci.call_category, ci.call_outcome, ci.threat_detected, ci.threat_details, ci.social_media_mention, ci.social_media_details, ci.escalation_request, ci.escalation_details, ci.regulatory_mention, ci.regulatory_details, ci.customer_sentiment_overall, ci.summary, ci.key_moments FROM call_insights ci JOIN calls c ON c.id=ci.call_id ${baseWhere} AND (ci.threat_detected=true OR ci.social_media_mention=true OR ci.escalation_request=true OR ci.regulatory_mention=true) ORDER BY c.call_date DESC LIMIT 100`, params),
+        // complaints
+        db.query(`SELECT complaint, COUNT(*) AS frequency FROM call_insights ci JOIN calls c ON c.id=ci.call_id, jsonb_array_elements_text(ci.top_complaints) AS complaint ${baseWhere} AND ci.top_complaints != '[]'::jsonb GROUP BY complaint ORDER BY frequency DESC LIMIT 15`, params),
+        // moments
+        db.query(`SELECT moment->>'type' AS moment_type, COUNT(*) AS frequency FROM call_insights ci JOIN calls c ON c.id=ci.call_id, jsonb_array_elements(ci.key_moments) AS moment ${baseWhere} AND ci.key_moments != '[]'::jsonb GROUP BY moment->>'type' ORDER BY frequency DESC`, params),
+        // sentiment by agent
+        db.query(`SELECT c.agent_name, COUNT(*) AS total_calls, ROUND(AVG(ci.customer_sentiment_score)::numeric,2) AS avg_customer_sentiment, ROUND(AVG(ci.agent_sentiment_score)::numeric,2) AS avg_agent_sentiment, COUNT(*) FILTER (WHERE ci.customer_sentiment_overall='Negative') AS negative_calls, COUNT(*) FILTER (WHERE ci.customer_sentiment_overall='Positive') AS positive_calls, COUNT(*) FILTER (WHERE ci.escalation_request=true) AS escalations, COUNT(*) FILTER (WHERE ci.threat_detected=true) AS threats FROM call_insights ci JOIN calls c ON c.id=ci.call_id ${baseWhere} GROUP BY c.agent_name ORDER BY avg_customer_sentiment DESC`, params),
+        // locations
+        db.query(`SELECT ci.location_mentioned AS location, COUNT(*) AS call_count FROM call_insights ci JOIN calls c ON c.id=ci.call_id ${baseWhere} AND ci.location_mentioned IS NOT NULL GROUP BY ci.location_mentioned ORDER BY call_count DESC`, params),
+        // products
+        db.query(`SELECT product, COUNT(*) AS frequency FROM call_insights ci JOIN calls c ON c.id=ci.call_id, jsonb_array_elements_text(ci.product_mentions) AS product ${baseWhere} AND ci.product_mentions != '[]'::jsonb GROUP BY product ORDER BY frequency DESC LIMIT 30`, params),
+      ]);
+
+    res.json({
+      summary: summary.rows[0],
+      categories: categories.rows,
+      signals: signals.rows,
+      complaints: complaints.rows,
+      moments: moments.rows,
+      sentimentByAgent: sentimentByAgent.rows,
+      locations: locations.rows,
+      products: products.rows,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Insights summary — top-level KPIs
 router.get('/summary', async (req, res) => {
   const { tenantId } = req.user;

@@ -227,38 +227,32 @@ export default function InsightsPage() {
     } catch (_) {}
   }, [apiFetch, globalDate]);
 
-  // ── initial parallel fetch ──
+  // ── initial fetch — single aggregated call ──
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     const qs = globalDate ? `?from=${globalDate}&to=${globalDate} 23:59:59` : '';
-    const qsAnd = globalDate ? `&from=${globalDate}&to=${globalDate} 23:59:59` : '';
 
-    Promise.allSettled([
-      apiFetch(`/api/insights/summary${qs}`),
-      apiFetch(`/api/insights/categories${qs}`),
-      apiFetch(`/api/insights/signals${qs}`),
-      apiFetch(`/api/insights/complaints?limit=15${qsAnd}`),
-      apiFetch(`/api/insights/moments${qs}`),
-      apiFetch(`/api/insights/sentiment-by-agent${qs}`),
-      apiFetch(`/api/insights/locations${qs}`),
-      apiFetch(`/api/insights/products${qs}`),
-    ]).then(([s, cat, sig, comp, mom, sba, loc, prod]) => {
-      if (cancelled) return;
-
-      if (s.status === 'fulfilled')   setSummary(s.value);
-      if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : cat.value?.categories ?? []);
-      if (sig.status === 'fulfilled') setSignals(Array.isArray(sig.value) ? sig.value : sig.value?.signals ?? []);
-      if (comp.status === 'fulfilled') setComplaints(Array.isArray(comp.value) ? comp.value : comp.value?.complaints ?? []);
-      if (mom.status === 'fulfilled') setMoments(Array.isArray(mom.value) ? mom.value : mom.value?.moments ?? []);
-      if (sba.status === 'fulfilled') setSentimentByAgent(Array.isArray(sba.value) ? sba.value : sba.value?.agents ?? []);
-      if (loc.status === 'fulfilled') setLocations(Array.isArray(loc.value) ? loc.value : loc.value?.locations ?? []);
-      if (prod.status === 'fulfilled') setProducts(Array.isArray(prod.value) ? prod.value : prod.value?.products ?? []);
-
-      setLoading(false);
-    });
+    apiFetch(`/api/insights/all${qs}`)
+      .then((d) => {
+        if (cancelled) return;
+        if (d.summary)         setSummary(d.summary);
+        if (d.categories)      setCategories(d.categories);
+        if (d.signals)         setSignals(d.signals);
+        if (d.complaints)      setComplaints(d.complaints);
+        if (d.moments)         setMoments(d.moments);
+        if (d.sentimentByAgent) setSentimentByAgent(d.sentimentByAgent);
+        if (d.locations)       setLocations(d.locations);
+        if (d.products)        setProducts(d.products);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e.message);
+        setLoading(false);
+      });
 
     return () => { cancelled = true; };
   }, [apiFetch, globalDate]);
