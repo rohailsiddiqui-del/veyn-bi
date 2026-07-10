@@ -16,7 +16,7 @@ function fmt(n, decimals = 1) {
 }
 
 export default function ParamsPage() {
-  const { apiFetch, globalDate } = useAuth();
+  const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
 
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('all');
@@ -40,10 +40,8 @@ export default function ParamsPage() {
     
     const paramsQuery = new URLSearchParams();
     if (selectedAgent && selectedAgent !== 'all') paramsQuery.append('agent', selectedAgent);
-    if (globalDate) {
-      paramsQuery.append('from', globalDate);
-      paramsQuery.append('to', globalDate + ' 23:59:59');
-    }
+    if (globalDateFrom) { paramsQuery.append('from', globalDateFrom); }
+    if (globalDateTo)   { paramsQuery.append('to', globalDateTo + ' 23:59:59'); }
     const q = paramsQuery.toString() ? `?${paramsQuery.toString()}` : '';
 
     try {
@@ -57,7 +55,7 @@ export default function ParamsPage() {
     } finally {
       setLoadingParams(false);
     }
-  }, [apiFetch, selectedAgent, globalDate]);
+  }, [apiFetch, selectedAgent, globalDateFrom, globalDateTo]);
 
   useEffect(() => {
     fetchParams();

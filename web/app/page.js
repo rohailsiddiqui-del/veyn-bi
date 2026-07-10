@@ -17,13 +17,29 @@ import AlertSettingsPage from './pages/AlertSettingsPage';
 import { Spinner } from './components/ui';
 
 export default function AppShell() {
-  const { token, user, globalDate, setGlobalDate } = useAuth();
+  const { token, user, globalDateFrom, setGlobalDateFrom, globalDateTo, setGlobalDateTo } = useAuth();
   const [activePage, setActivePage] = useState('overview');
   const [mounted, setMounted] = useState(false);
+  // react-datepicker range: [startDate, endDate]
+  const [dateRange, setDateRange] = useState([null, null]);
+  const [startDate, endDate] = dateRange;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleDateChange = (update) => {
+    setDateRange(update);
+    const [start, end] = update;
+    setGlobalDateFrom(start ? format(start, 'yyyy-MM-dd') : '');
+    setGlobalDateTo(end ? format(end, 'yyyy-MM-dd') : '');
+  };
+
+  const clearDates = () => {
+    setDateRange([null, null]);
+    setGlobalDateFrom('');
+    setGlobalDateTo('');
+  };
 
   if (!mounted) {
     return <div className="min-h-screen bg-bg flex items-center justify-center"><Spinner /></div>;
@@ -47,11 +63,17 @@ export default function AppShell() {
     }
   };
 
+  const dateLabel = globalDateFrom && globalDateTo
+    ? `${globalDateFrom} → ${globalDateTo}`
+    : globalDateFrom
+    ? `${globalDateFrom} →`
+    : 'All dates';
+
   return (
     <div className="flex min-h-screen bg-bg">
       <Sidebar activePage={activePage} onNavigate={setActivePage} />
       <main className="flex-1 ml-[220px] p-8 pb-10">
-        
+
         {/* Global Dashboard Header */}
         <header className="mb-6 flex items-center justify-between bg-surface border border-border p-4 rounded-xl shadow-sm">
           <div>
@@ -59,16 +81,25 @@ export default function AppShell() {
             <p className="text-xs text-text-muted mt-0.5">Veyn BI Intelligence Dashboard</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-text-muted">Global Date Filter:</span>
-            <DatePicker 
-              selected={globalDate ? new Date(globalDate + 'T12:00:00') : null}
-              onChange={(date) => setGlobalDate(date ? format(date, 'yyyy-MM-dd') : '')}
-              className="bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm text-text-main focus:border-primary outline-none transition-colors w-[130px]"
-              placeholderText="Select date..."
+            <span className="text-sm font-medium text-text-muted">Date Range:</span>
+            <DatePicker
+              selectsRange
+              startDate={startDate}
+              endDate={endDate}
+              onChange={handleDateChange}
+              className="bg-bg border border-border2 rounded-lg px-3 py-1.5 text-sm text-text-main focus:border-primary outline-none transition-colors w-[200px]"
+              placeholderText="Select date range..."
               dateFormat="MMM d, yyyy"
-              isClearable
-              title="Filter entire dashboard by date"
+              title="Filter entire dashboard by date range"
             />
+            {(globalDateFrom || globalDateTo) && (
+              <button
+                onClick={clearDates}
+                className="text-xs text-text-muted hover:text-text-main px-2 py-1 rounded border border-border2 transition-colors"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </header>
 

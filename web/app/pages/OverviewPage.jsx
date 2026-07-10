@@ -21,7 +21,7 @@ function fmt(n, decimals = 0) {
 }
 
 export default function OverviewPage() {
-  const { apiFetch, globalDate } = useAuth();
+  const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
 
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('all');
@@ -33,12 +33,12 @@ export default function OverviewPage() {
   // Load agent list
   useEffect(() => {
     setLoadingAgents(true);
-    const qs = globalDate ? `?from=${globalDate}&to=${globalDate} 23:59:59` : '';
+    const qs = globalDateFrom ? `?from=${globalDateFrom}${globalDateTo ? `&to=${globalDateTo} 23:59:59` : ''}` : '';
     apiFetch(`/api/analytics/agents${qs}`)
       .then((data) => setAgents(Array.isArray(data) ? data : data.agents ?? []))
       .catch(console.error)
       .finally(() => setLoadingAgents(false));
-  }, [apiFetch, globalDate]);
+  }, [apiFetch, globalDateFrom, globalDateTo]);
 
   // Load summary + distribution whenever the agent filter changes
   const fetchData = useCallback(async () => {
@@ -47,10 +47,8 @@ export default function OverviewPage() {
     setDistribution(null);
     const params = new URLSearchParams();
     if (selectedAgent && selectedAgent !== 'all') params.append('agent', selectedAgent);
-    if (globalDate) {
-      params.append('from', globalDate);
-      params.append('to', globalDate + ' 23:59:59');
-    }
+    if (globalDateFrom) { params.append('from', globalDateFrom); }
+    if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
     const q = params.toString() ? `?${params.toString()}` : '';
     try {
       const [sum, dist] = await Promise.all([
@@ -64,7 +62,7 @@ export default function OverviewPage() {
     } finally {
       setLoadingData(false);
     }
-  }, [apiFetch, selectedAgent, globalDate]);
+  }, [apiFetch, selectedAgent, globalDateFrom, globalDateTo]);
 
   useEffect(() => {
     fetchData();
@@ -89,8 +87,10 @@ export default function OverviewPage() {
   prior.setDate(prior.getDate() - 30);
   const fmtDate = (d) =>
     d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const dateRangeLabel = globalDate 
-    ? fmtDate(new Date(globalDate)) 
+  const dateRangeLabel = globalDateFrom && globalDateTo
+    ? `${fmtDate(new Date(globalDateFrom + 'T12:00:00'))} – ${fmtDate(new Date(globalDateTo + 'T12:00:00'))}`
+    : globalDateFrom
+    ? `From ${fmtDate(new Date(globalDateFrom + 'T12:00:00'))}`
     : `${fmtDate(prior)} – ${fmtDate(today)}`;
 
   return (

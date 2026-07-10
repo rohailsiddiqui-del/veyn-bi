@@ -193,7 +193,7 @@ function ExpandedCall({ callId }) {
 // ─── main component ──────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const { apiFetch, globalDate } = useAuth();
+  const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
 
   // ── data state ──
   const [summary, setSummary]               = useState(null);
@@ -219,15 +219,13 @@ export default function InsightsPage() {
     try {
       const params = new URLSearchParams();
       if (type && type !== 'all') params.append('type', type);
-      if (globalDate) {
-        params.append('from', globalDate);
-        params.append('to', globalDate + ' 23:59:59');
-      }
+      if (globalDateFrom) { params.append('from', globalDateFrom); }
+      if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
       const qs = params.toString();
       const data = await apiFetch(`/api/insights/signals${qs ? '?' + qs : ''}`);
       setSignals(Array.isArray(data) ? data : data.signals ?? []);
     } catch (_) {}
-  }, [apiFetch, globalDate]);
+  }, [apiFetch, globalDateFrom, globalDateTo]);
 
   // ── initial fetch — single aggregated call ──
   useEffect(() => {
@@ -235,7 +233,10 @@ export default function InsightsPage() {
     setLoading(true);
     setError(null);
 
-    const qs = globalDate ? `?from=${globalDate}&to=${encodeURIComponent(globalDate + ' 23:59:59')}` : '';
+    const qp = new URLSearchParams();
+    if (globalDateFrom) { qp.append('from', globalDateFrom); }
+    if (globalDateTo)   { qp.append('to', globalDateTo + ' 23:59:59'); }
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
 
     apiFetch(`/api/insights/all${qs}`)
       .then((d) => {
@@ -257,7 +258,7 @@ export default function InsightsPage() {
       });
 
     return () => { cancelled = true; };
-  }, [apiFetch, globalDate]);
+  }, [apiFetch, globalDateFrom, globalDateTo]);
 
   // ── signal filters (table) ──
   useEffect(() => {

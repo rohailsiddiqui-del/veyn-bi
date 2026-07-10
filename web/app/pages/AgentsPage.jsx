@@ -30,7 +30,7 @@ function fmt(n, decimals = 0) {
 }
 
 /* ─── Coaching panel ─────────────────────────────────────────────────── */
-function CoachingPanel({ agentName, apiFetch, globalDate }) {
+function CoachingPanel({ agentName, apiFetch, globalDateFrom, globalDateTo }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,12 +38,15 @@ function CoachingPanel({ agentName, apiFetch, globalDate }) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const qs = globalDate ? `?from=${globalDate}&to=${globalDate} 23:59:59` : '';
+    const params = new URLSearchParams();
+    if (globalDateFrom) { params.append('from', globalDateFrom); }
+    if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
+    const qs = params.toString() ? `?${params.toString()}` : '';
     apiFetch(`/api/analytics/agents/${encodeURIComponent(agentName)}/coaching${qs}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [agentName, apiFetch, globalDate]);
+  }, [agentName, apiFetch, globalDateFrom, globalDateTo]);
 
   if (loading) return <div className="px-4 pb-4"><Spinner /></div>;
   if (error) return <div className="px-4 pb-4 text-danger text-xs">{error}</div>;
@@ -89,7 +92,7 @@ function CoachingPanel({ agentName, apiFetch, globalDate }) {
 
 /* ─── Main page ──────────────────────────────────────────────────────── */
 export default function AgentsPage() {
-  const { apiFetch, globalDate } = useAuth();
+  const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
 
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +102,10 @@ export default function AgentsPage() {
   const loadAgents = useCallback(async () => {
     setLoading(true);
     try {
-      const qs = globalDate ? `?from=${globalDate}&to=${globalDate} 23:59:59` : '';
+      const params = new URLSearchParams();
+      if (globalDateFrom) { params.append('from', globalDateFrom); }
+      if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
+      const qs = params.toString() ? `?${params.toString()}` : '';
       const data = await apiFetch(`/api/analytics/agents${qs}`);
       setAgents(Array.isArray(data) ? data : data.agents ?? []);
     } catch (err) {
@@ -107,7 +113,7 @@ export default function AgentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, globalDate]);
+  }, [apiFetch, globalDateFrom, globalDateTo]);
 
   useEffect(() => {
     loadAgents();
@@ -261,7 +267,7 @@ export default function AgentsPage() {
                     {isExpanded && (
                       <tr key={`${name}-coaching`} className="bg-surface2/60">
                         <td colSpan={9} className="pt-4 px-0 pb-0">
-                          <CoachingPanel agentName={name} apiFetch={apiFetch} globalDate={globalDate} />
+                          <CoachingPanel agentName={name} apiFetch={apiFetch} globalDateFrom={globalDateFrom} globalDateTo={globalDateTo} />
                         </td>
                       </tr>
                     )}

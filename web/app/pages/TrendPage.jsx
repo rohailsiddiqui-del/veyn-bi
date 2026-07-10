@@ -5,7 +5,7 @@ import { CardPanel, Select, Spinner, EmptyState } from '@/app/components/ui';
 import { LineChart, BarChart } from '@/app/components/Charts';
 
 export default function TrendPage() {
-  const { apiFetch, globalDate } = useAuth();
+  const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
   const [agent, setAgent] = useState('all');
   const [agents, setAgents] = useState([]);
   const [trend, setTrend] = useState(null);
@@ -26,10 +26,8 @@ export default function TrendPage() {
       try {
         const params = new URLSearchParams();
         if (selectedAgent && selectedAgent !== 'all') params.append('agent', selectedAgent);
-        if (globalDate) {
-          params.append('from', globalDate);
-          params.append('to', globalDate + ' 23:59:59');
-        }
+        if (globalDateFrom) { params.append('from', globalDateFrom); }
+        if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
         const qs = params.toString() ? `?${params.toString()}` : '';
         const data = await apiFetch(`/api/analytics/trend${qs}`);
         setTrend(data);
@@ -39,7 +37,7 @@ export default function TrendPage() {
         setLoading(false);
       }
     },
-    [apiFetch, globalDate]
+    [apiFetch, globalDateFrom, globalDateTo]
   );
 
   useEffect(() => {

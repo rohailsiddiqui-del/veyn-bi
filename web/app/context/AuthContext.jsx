@@ -14,7 +14,8 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [theme, setThemeState] = useState('dark');
-  const [globalDate, setGlobalDate] = useState('');
+  const [globalDateFrom, setGlobalDateFrom] = useState('');
+  const [globalDateTo, setGlobalDateTo] = useState('');
 
   useEffect(() => {
     const t = localStorage.getItem('veyn_bi_token');
@@ -73,7 +74,7 @@ export function AuthProvider({ children }) {
   );
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, apiFetch, theme, setTheme: setThemeState, apiBase: API_BASE, globalDate, setGlobalDate }}>
+    <AuthContext.Provider value={{ token, user, login, logout, apiFetch, theme, setTheme: setThemeState, apiBase: API_BASE, globalDateFrom, setGlobalDateFrom, globalDateTo, setGlobalDateTo }}>
       {children}
     </AuthContext.Provider>
   );
