@@ -118,26 +118,28 @@ function ExpandedCall({ callId }) {
   if (err) return <div className="py-3 text-sm text-danger">Failed to load: {err}</div>;
   if (!detail) return null;
 
-  const moments = detail.moments ?? detail.keyMoments ?? detail.key_moments ?? [];
+  const insight = detail.insight || {};
+  const transcriptStr = detail.transcript?.translation_text ?? detail.transcript?.transcription_text ?? insight.transcript;
+  const moments = insight.moments ?? insight.keyMoments ?? insight.key_moments ?? [];
 
   return (
     <div className="space-y-4 text-sm">
       {/* Summary */}
-      {detail.summary && (
+      {insight.summary && (
         <div>
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-1">Summary</div>
-          <p className="text-text-main leading-relaxed">{detail.summary}</p>
+          <p className="text-text-main leading-relaxed">{insight.summary}</p>
         </div>
       )}
 
       {/* Why flagged */}
-      {(detail.threat_details || detail.escalation_details || detail.social_media_details || detail.regulatory_details) && (
+      {(insight.threat_details || insight.escalation_details || insight.social_media_details || insight.regulatory_details) && (
         <div className="space-y-3">
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-1">Why Flagged</div>
-          {detail.threat_details && <p className="text-red-400 leading-relaxed text-xs"><strong>Threat:</strong> {detail.threat_details}</p>}
-          {detail.escalation_details && <p className="text-amber-400 leading-relaxed text-xs"><strong>Escalation:</strong> {detail.escalation_details}</p>}
-          {detail.social_media_details && <p className="text-blue-400 leading-relaxed text-xs"><strong>Social:</strong> {detail.social_media_details}</p>}
-          {detail.regulatory_details && <p className="text-purple-400 leading-relaxed text-xs"><strong>Regulatory:</strong> {detail.regulatory_details}</p>}
+          {insight.threat_details && <p className="text-red-400 leading-relaxed text-xs"><strong>Threat:</strong> {insight.threat_details}</p>}
+          {insight.escalation_details && <p className="text-amber-400 leading-relaxed text-xs"><strong>Escalation:</strong> {insight.escalation_details}</p>}
+          {insight.social_media_details && <p className="text-blue-400 leading-relaxed text-xs"><strong>Social:</strong> {insight.social_media_details}</p>}
+          {insight.regulatory_details && <p className="text-purple-400 leading-relaxed text-xs"><strong>Regulatory:</strong> {insight.regulatory_details}</p>}
         </div>
       )}
 
@@ -158,29 +160,29 @@ function ExpandedCall({ callId }) {
       )}
 
       {/* Outcome / Category */}
-      {(detail.call_outcome || detail.call_category) && (
+      {(insight.call_outcome || insight.call_category) && (
         <div className="flex gap-4 flex-wrap">
-          {detail.call_category && (
+          {insight.call_category && (
             <div>
               <div className="text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-1">Category</div>
-              <Badge variant="info">{detail.call_category}</Badge>
+              <Badge variant="info">{insight.call_category}</Badge>
             </div>
           )}
-          {detail.call_outcome && (
+          {insight.call_outcome && (
             <div>
               <div className="text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-1">Outcome</div>
-              <Badge variant="default">{detail.call_outcome}</Badge>
+              <Badge variant="default">{insight.call_outcome}</Badge>
             </div>
           )}
         </div>
       )}
 
       {/* Transcript */}
-      {detail.transcript && (
+      {transcriptStr && (
         <div>
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-2">Transcript</div>
           <div className="max-h-64 overflow-y-auto rounded-lg bg-surface border border-border p-3 font-mono text-xs text-text-muted whitespace-pre-wrap leading-relaxed">
-            {detail.transcript}
+            {transcriptStr}
           </div>
         </div>
       )}
@@ -233,7 +235,7 @@ export default function InsightsPage() {
     setLoading(true);
     setError(null);
 
-    const qs = globalDate ? `?from=${globalDate}&to=${globalDate} 23:59:59` : '';
+    const qs = globalDate ? `?from=${globalDate}&to=${encodeURIComponent(globalDate + ' 23:59:59')}` : '';
 
     apiFetch(`/api/insights/all${qs}`)
       .then((d) => {
@@ -282,13 +284,22 @@ export default function InsightsPage() {
   const catCounts    = categories.map((c) => Number(c.count ?? 0));
   const CAT_COLORS   = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6'];
 
-  const sentLabels   = (summary?.sentimentDistribution ?? []).map((s) => s.label ?? s._id ?? s.range ?? '');
-  const sentCounts   = (summary?.sentimentDistribution ?? []).map((s) => s.count ?? 0);
-  const SENT_COLORS  = ['#EF4444', '#F59E0B', '#22C55E', '#3B82F6'];
+  const sentLabels   = ['Positive', 'Neutral', 'Mixed', 'Negative'];
+  const sentCounts   = [
+    Number(summary?.positive_calls || 0),
+    Number(summary?.neutral_calls || 0),
+    Number(summary?.mixed_calls || 0),
+    Number(summary?.negative_calls || 0)
+  ];
+  const SENT_COLORS  = ['#22C55E', '#F59E0B', '#8B5CF6', '#EF4444'];
 
-  const outLabels    = (summary?.outcomes ?? []).map((o) => o.label ?? o._id ?? o.outcome ?? '');
-  const outCounts    = (summary?.outcomes ?? []).map((o) => o.count ?? 0);
-  const OUT_COLORS   = ['#22C55E', '#EF4444', '#F59E0B', '#8B5CF6', '#3B82F6'];
+  const outLabels    = ['Resolved', 'Unresolved', 'Escalated'];
+  const outCounts    = [
+    Number(summary?.resolved_calls || 0),
+    Number(summary?.unresolved_calls || 0),
+    Number(summary?.escalated_calls || 0)
+  ];
+  const OUT_COLORS   = ['#22C55E', '#EF4444', '#F59E0B'];
 
   // Talk% — API returns avg_customer_talk_pct (snake_case)
   const talkLabels   = ['Agent Talk', 'Customer Talk'];
