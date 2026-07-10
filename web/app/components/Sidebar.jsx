@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { id: 'insights', label: 'Insights', icon: Brain },
   { id: 'chat', label: 'AI Chat', icon: MessageSquare },
   { id: 'upload', label: 'Upload', icon: Upload },
-  { id: 'settings', label: 'Alerts', icon: Bell },
+  { id: 'settings', label: 'Settings', icon: Bell },
 ];
 
 export default function Sidebar({ activePage, onNavigate }) {
