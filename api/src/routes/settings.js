@@ -55,4 +55,52 @@ router.post('/alerts/test', async (req, res) => {
   }
 });
 
+// GET voice app API credentials
+router.get('/api-credentials', async (req, res) => {
+  const { tenantId } = req.user;
+  try {
+    const result = await db.query(
+      `SELECT voice_app_username, voice_app_org_id,
+              voice_app_eval_url, voice_app_trans_url, voice_app_trans_token
+       FROM tenants WHERE id=$1`,
+      [tenantId]
+    );
+    const row = result.rows[0] || {};
+    res.json({
+      username:   row.voice_app_username  || '',
+      org_id:     row.voice_app_org_id    || '',
+      eval_url:   row.voice_app_eval_url  || 'https://autovox-be.veyn.co.uk',
+      trans_url:  row.voice_app_trans_url || 'https://autovox-translation-api.veyn.ai',
+      trans_token: row.voice_app_trans_token || '',
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT save voice app API credentials
+router.put('/api-credentials', async (req, res) => {
+  const { tenantId } = req.user;
+  const { username, password, org_id, eval_url, trans_url, trans_token } = req.body;
+  try {
+    await db.query(
+      `UPDATE tenants SET
+        voice_app_username=$1,
+        voice_app_password=$2,
+        voice_app_org_id=$3,
+        voice_app_eval_url=$4,
+        voice_app_trans_url=$5,
+        voice_app_trans_token=$6
+       WHERE id=$7`,
+      [username || null, password || null, org_id || null,
+       eval_url || 'https://autovox-be.veyn.co.uk',
+       trans_url || 'https://autovox-translation-api.veyn.ai',
+       trans_token || null, tenantId]
+    );
+    res.json({ message: 'API credentials saved' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

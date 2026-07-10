@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { CardPanel, Button, Input, Spinner } from '@/app/components/ui';
 import { cn } from '@/app/lib/utils';
-import { Bell, Info, AlertTriangle } from 'lucide-react';
+import { Bell, Info, AlertTriangle, Key } from 'lucide-react';
 
 export default function AlertSettingsPage() {
   const { apiFetch, token, apiBase } = useAuth();
@@ -14,6 +14,15 @@ export default function AlertSettingsPage() {
   const [saveStatus, setSaveStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // API credentials state
+  const [apiUsername, setApiUsername] = useState('');
+  const [apiPassword, setApiPassword] = useState('');
+  const [apiOrgId, setApiOrgId] = useState('');
+  const [apiEvalUrl, setApiEvalUrl] = useState('https://autovox-be.veyn.co.uk');
+  const [apiTransUrl, setApiTransUrl] = useState('https://autovox-translation-api.veyn.ai');
+  const [apiTransToken, setApiTransToken] = useState('');
+  const [credStatus, setCredStatus] = useState(null);
+
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -22,6 +31,15 @@ export default function AlertSettingsPage() {
         setAlertEmail(data.alert_email || '');
         setThreatEnabled((data.alert_signals || []).includes('threat'));
         setEscalationEnabled((data.alert_signals || []).includes('escalation'));
+      } catch (e) { console.error(e); }
+
+      try {
+        const creds = await apiFetch('/api/settings/api-credentials');
+        setApiUsername(creds.username || '');
+        setApiOrgId(creds.org_id ? String(creds.org_id) : '');
+        setApiEvalUrl(creds.eval_url || 'https://autovox-be.veyn.co.uk');
+        setApiTransUrl(creds.trans_url || 'https://autovox-translation-api.veyn.ai');
+        setApiTransToken(creds.trans_token || '');
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     }
@@ -59,6 +77,23 @@ export default function AlertSettingsPage() {
       if (!res.ok) throw new Error(data.error);
       setSaveStatus({ type: 'success', msg: '✓ ' + data.message });
     } catch (e) { setSaveStatus({ type: 'error', msg: 'Error: ' + e.message }); }
+  }
+
+  async function saveCredentials() {
+    setCredStatus({ type: 'loading', msg: 'Saving...' });
+    try {
+      await apiFetch('/api/settings/api-credentials', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: apiUsername, password: apiPassword || undefined,
+          org_id: apiOrgId ? parseInt(apiOrgId) : null,
+          eval_url: apiEvalUrl, trans_url: apiTransUrl, trans_token: apiTransToken,
+        }),
+      });
+      setApiPassword('');
+      setCredStatus({ type: 'success', msg: '✓ Credentials saved' });
+    } catch (e) { setCredStatus({ type: 'error', msg: 'Error: ' + e.message }); }
   }
 
   if (loading) return <Spinner />;
@@ -127,6 +162,52 @@ export default function AlertSettingsPage() {
             <div className="flex items-start gap-2"><Bell size={14} className="mt-0.5 flex-shrink-0 text-primary-soft" /><span><strong className="text-text-main">When:</strong> After every batch of calls is processed through AI insights</span></div>
             <div className="flex items-start gap-2"><Info size={14} className="mt-0.5 flex-shrink-0 text-info" /><span><strong className="text-text-main">What:</strong> One email listing all threat and escalation calls from that batch</span></div>
             <div className="flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-warning" /><span><strong className="text-text-main">Backtrack:</strong> Each call includes agent name, date, flag details — go to Insights → Flagged Calls to view</span></div>
+          </div>
+        </CardPanel>
+
+        <CardPanel title="API Credentials">
+          <p className="text-sm text-text-muted mb-4">
+            Voice App credentials used by the <strong>Pull from API</strong> feature on the Upload page.
+            Password field is write-only — leave blank to keep the current password.
+          </p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest block mb-1.5">Username</label>
+              <Input value={apiUsername} onChange={e => setApiUsername(e.target.value)} placeholder="logoadmin" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest block mb-1.5">Password</label>
+              <Input type="password" value={apiPassword} onChange={e => setApiPassword(e.target.value)} placeholder="Leave blank to keep current" />
+            </div>
+          </div>
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-text-muted uppercase tracking-widest block mb-1.5">Org ID</label>
+            <Input value={apiOrgId} onChange={e => setApiOrgId(e.target.value)} placeholder="64" className="max-w-[120px]" />
+          </div>
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-text-muted uppercase tracking-widest block mb-1.5">Eval Base URL</label>
+            <Input value={apiEvalUrl} onChange={e => setApiEvalUrl(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 gap-3 mb-4">
+            <div>
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest block mb-1.5">Translation Base URL</label>
+              <Input value={apiTransUrl} onChange={e => setApiTransUrl(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest block mb-1.5">Translation Static Token</label>
+              <Input value={apiTransToken} onChange={e => setApiTransToken(e.target.value)} placeholder="d1cf7f8c..." />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={saveCredentials} className="w-auto px-6">
+              <Key size={13} className="inline mr-1.5" />
+              Save Credentials
+            </Button>
+            {credStatus && (
+              <span className={cn('text-xs', credStatus.type === 'success' ? 'text-success' : credStatus.type === 'error' ? 'text-danger' : 'text-text-muted')}>
+                {credStatus.msg}
+              </span>
+            )}
           </div>
         </CardPanel>
       </div>

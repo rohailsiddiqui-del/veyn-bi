@@ -42,6 +42,94 @@ router.post('/', upload.fields([{ name: 'eval' }, { name: 'trans' }]), async (re
   }
 });
 
+// Pull eval + translation CSVs from Voice App API and ingest
+router.post('/pull-from-api', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  const { date_from, date_to, direction, batch_name } = req.body;
+
+  if (!date_from || !date_to) return res.status(400).json({ error: 'date_from and date_to are required' });
+
+  // Load credentials from tenant row
+  let creds;
+  try {
+    const result = await db.query(
+      `SELECT voice_app_username, voice_app_password, voice_app_org_id,
+              voice_app_eval_url, voice_app_trans_url, voice_app_trans_token
+       FROM tenants WHERE id=$1`,
+      [tenantId]
+    );
+    creds = result.rows[0];
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load API credentials: ' + e.message });
+  }
+
+  if (!creds?.voice_app_username || !creds?.voice_app_password) {
+    return res.status(400).json({ error: 'Voice App API credentials not configured. Go to Settings → API Credentials.' });
+  }
+
+  const evalBaseUrl  = creds.voice_app_eval_url  || 'https://autovox-be.veyn.co.uk';
+  const transBaseUrl = creds.voice_app_trans_url || 'https://autovox-translation-api.veyn.ai';
+  const transToken   = creds.voice_app_trans_token || '';
+  const range = `${date_from}/${date_to}`;
+
+  try {
+    // 1. Login to Voice App
+    const loginRes = await fetch(`${evalBaseUrl}/rbac/auth-user/login/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: creds.voice_app_username, password: creds.voice_app_password }),
+    });
+    if (!loginRes.ok) return res.status(400).json({ error: `Voice App login failed: HTTP ${loginRes.status}` });
+    const loginData = await loginRes.json();
+    const voiceToken = loginData?.data?.access;
+    const orgId = creds.voice_app_org_id || loginData?.data?.org_id;
+    if (!voiceToken) return res.status(400).json({ error: 'No access token from Voice App login' });
+
+    // 2. Fetch Eval CSV
+    const evalRes = await fetch(`${evalBaseUrl}/core/call-evaluation/evaluation_list/?download=1&key=duration&order=desc&date_range=${range}`, {
+      headers: { Authorization: `Bearer ${voiceToken}` },
+    });
+    if (!evalRes.ok) return res.status(400).json({ error: `Eval fetch failed: HTTP ${evalRes.status}` });
+    const evalText = await evalRes.text();
+    const evalRows = evalText.trim().split('\n').length - 1;
+
+    // 3. Fetch Translation CSV
+    let transText = null;
+    if (orgId) {
+      const transRes = await fetch(`${transBaseUrl}/get_all_translations?date_range=${range}&org_id=${orgId}`, {
+        headers: { Authorization: `Bearer ${transToken}` },
+      });
+      if (transRes.ok) transText = await transRes.text();
+    }
+
+    if (evalRows === 0) return res.status(200).json({ message: 'No calls found for this date range', evalRows: 0 });
+
+    // 4. Create batch and ingest
+    const batchNameFinal = batch_name || `API Pull ${range}`;
+    const callDir = ['inbound','outbound','mixed'].includes(direction) ? direction : 'inbound';
+
+    const batchRes = await db.query(
+      `INSERT INTO upload_batches (tenant_id, batch_name, eval_filename, trans_filename, status, source)
+       VALUES ($1,$2,$3,$4,'processing','api') RETURNING id`,
+      [tenantId, batchNameFinal, `api-eval-${range}.csv`, transText ? `api-trans-${range}.csv` : null]
+    );
+    const batchId = batchRes.rows[0].id;
+
+    res.json({ message: `Fetched ${evalRows} calls from API, processing...`, batchId, evalRows });
+
+    const { ingestCSVs } = require('../services/ingest');
+    ingestCSVs(tenantId, batchId, evalText, transText, callDir)
+      .then(r => console.log(`API pull batch ${batchId}: ${r.inserted} calls ingested`))
+      .catch(e => {
+        console.error(`API pull batch ${batchId} error:`, e.message);
+        db.query('UPDATE upload_batches SET status=$1 WHERE id=$2', ['error', batchId]);
+      });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get batch status
 router.get('/batches', async (req, res) => {
   try {
