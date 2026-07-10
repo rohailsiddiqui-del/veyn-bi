@@ -203,7 +203,7 @@ async function processCallInsights(callId, tenantId, transcriptText, industry = 
 }
 
 // Process all unprocessed calls with transcripts for a tenant
-async function processBatchInsights(tenantId, batchId, concurrency = 3) {
+async function processBatchInsights(tenantId, batchId, concurrency = 10) {
   // Fetch tenant's industry for industry-aware prompt injection
   const tenantRes = await db.query('SELECT industry FROM tenants WHERE id = $1', [tenantId]);
   const industry = tenantRes.rows[0]?.industry || 'generic';
@@ -232,7 +232,7 @@ async function processBatchInsights(tenantId, batchId, concurrency = 3) {
     }));
     results.forEach(r => r.success ? processed++ : errors++);
     // Small delay between chunks to avoid rate limits
-    if (i + concurrency < rows.length) await new Promise(r => setTimeout(r, 1000));
+    if (i + concurrency < rows.length) await new Promise(r => setTimeout(r, 200));
   }
 
   const result = { processed, errors, total: rows.length };
