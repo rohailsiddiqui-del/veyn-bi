@@ -8,6 +8,9 @@ cd ~/veyn-bi
 echo "[deploy] Pulling latest..."
 git pull
 
+echo "[deploy] Installing dependencies..."
+cd api && npm install --omit=dev && cd ..
+
 echo "[deploy] Restarting API..."
 pm2 restart veyn-bi-api
 
