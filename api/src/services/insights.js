@@ -89,7 +89,7 @@ async function extractInsights(transcriptText, industry = 'generic') {
       contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 3000,
+        maxOutputTokens: 8192,
         responseMimeType: 'application/json'
       }
     })
