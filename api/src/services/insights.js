@@ -71,7 +71,7 @@ function smartTruncate(text, max = 12000) {
 }
 
 async function extractInsights(transcriptText, industry = 'generic') {
-  if (!transcriptText || transcriptText.trim().length < 50) throw new Error('Transcript too short');
+  if (!transcriptText) transcriptText = '';
   transcriptText = smartTruncate(transcriptText);
 
   const industryContext = getIndustryPrompt(industry);
@@ -211,7 +211,7 @@ async function processBatchInsights(tenantId, batchId, concurrency = 10) {
   const { rows } = await db.query(`
     SELECT c.id AS call_id, ct.transcription_text, ct.translation_text
     FROM calls c
-    JOIN call_transcripts ct ON ct.call_id = c.id
+    LEFT JOIN call_transcripts ct ON ct.call_id = c.id
     LEFT JOIN call_insights ci ON ci.call_id = c.id
     WHERE c.tenant_id = $1
       AND ($2::uuid IS NULL OR c.batch_id = $2)
