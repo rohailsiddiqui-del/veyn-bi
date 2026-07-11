@@ -142,6 +142,30 @@ router.delete('/agents/:agentName', async (req, res) => {
   }
 });
 
+// Hard delete a single call by ID
+router.delete('/calls/:callId', async (req, res) => {
+  const { tenantId } = req.user;
+  const { callId } = req.params;
+
+  try {
+    // Verify call belongs to this tenant
+    const check = await db.query(
+      'SELECT id FROM calls WHERE id=$1 AND tenant_id=$2',
+      [callId, tenantId]
+    );
+    if (!check.rows.length) return res.status(404).json({ error: 'Call not found' });
+
+    await db.query('DELETE FROM call_insights WHERE call_id=$1', [callId]);
+    await db.query('DELETE FROM call_transcripts WHERE call_id=$1', [callId]);
+    await db.query('DELETE FROM call_param_scores WHERE call_id=$1', [callId]);
+    await db.query('DELETE FROM calls WHERE id=$1 AND tenant_id=$2', [callId, tenantId]);
+
+    res.json({ deleted: true, callId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Score trend (daily)
 router.get('/trend', async (req, res) => {
   const { tenantId } = req.user;

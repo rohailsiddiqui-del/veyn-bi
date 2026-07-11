@@ -213,6 +213,23 @@ export default function InsightsPage() {
   const [processing, setProcessing]         = useState(false);
   const [processStatus, setProcessStatus]   = useState('');
   const [expandedCallId, setExpandedCallId] = useState(null);
+  const [deletingCallId, setDeletingCallId] = useState(null);
+
+  // ── delete a single call ──
+  const deleteCall = useCallback(async (callId, e) => {
+    e.stopPropagation();
+    if (!confirm('Delete this call and all its data? This cannot be undone.')) return;
+    setDeletingCallId(callId);
+    try {
+      await apiFetch(`/api/analytics/calls/${callId}`, { method: 'DELETE' });
+      setSignals(prev => prev.filter(s => (s.call_id ?? s.callId ?? s.id) !== callId));
+      if (expandedCallId === callId) setExpandedCallId(null);
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    } finally {
+      setDeletingCallId(null);
+    }
+  }, [apiFetch, expandedCallId]);
 
   // ── fetch signals when type or date changes ──
   const fetchSignals = useCallback(async (type) => {
@@ -468,7 +485,7 @@ export default function InsightsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border">
-                  {['Call Ref', 'Agent', 'Date', 'Category', 'Flags', 'Sentiment', 'Details'].map((h) => (
+                  {['Call Ref', 'Agent', 'Date', 'Category', 'Flags', 'Sentiment', 'Details', ''].map((h) => (
                     <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-widest py-2 px-3">
                       {h}
                     </th>
@@ -520,10 +537,27 @@ export default function InsightsPage() {
                             {isExpanded ? '▲ Hide' : '▼ View'}
                           </span>
                         </td>
+                        <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => deleteCall(id, e)}
+                            disabled={deletingCallId === id}
+                            title="Delete this call"
+                            style={{
+                              padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              backgroundColor: deletingCallId === id ? '#374151' : 'rgba(239,68,68,0.1)',
+                              color: deletingCallId === id ? '#6b7280' : '#f87171',
+                              border: '1px solid rgba(239,68,68,0.3)',
+                              cursor: deletingCallId === id ? 'not-allowed' : 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {deletingCallId === id ? '…' : 'Delete'}
+                          </button>
+                        </td>
                       </tr>
                       {isExpanded && (
                         <tr key={`expanded-${id}`} className="bg-surface/50">
-                          <td colSpan={7} className="px-5 py-4 border-b border-border">
+                          <td colSpan={8} className="px-5 py-4 border-b border-border">
                             <ExpandedCall callId={id} />
                           </td>
                         </tr>
