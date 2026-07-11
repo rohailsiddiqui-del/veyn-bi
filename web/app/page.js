@@ -81,7 +81,10 @@ export default function AppShell() {
             <p className="text-xs text-text-muted mt-0.5">Veyn BI Intelligence Dashboard</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-text-muted">Date Range:</span>
+            <div className="text-right">
+              <span className="text-sm font-medium text-text-muted">Upload Date Range</span>
+              <span className="block text-[10px] text-text-muted">filters by when calls were imported</span>
+            </div>
             <DatePicker
               selectsRange
               startDate={startDate}

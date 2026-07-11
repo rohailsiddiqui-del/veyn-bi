@@ -83,7 +83,8 @@ export default function UploadPage() {
       if (!res.ok) {
         setPullStatus({ type: 'error', msg: data.error || 'Pull failed' });
       } else {
-        setPullStatus({ type: 'success', msg: data.message + (data.batchId ? ` (Batch: ${data.batchId.slice(0,8)}…)` : '') });
+        const uploadedAt = new Date().toLocaleString();
+        setPullStatus({ type: 'success', msg: data.message + (data.batchId ? ` — Uploaded at ${uploadedAt}. Use this date in the dashboard filter to view these calls.` : '') });
         setPullBatchName('');
         setTimeout(loadBatches, 3000);
       }
@@ -139,13 +140,22 @@ export default function UploadPage() {
             Make sure API credentials are saved in <strong>Settings → API Credentials</strong>.
           </p>
 
+          <div className="flex items-start gap-2 mb-4 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20">
+            <span className="text-primary-soft text-sm mt-0.5">ℹ</span>
+            <div className="text-xs text-text-muted leading-relaxed">
+              <span className="font-semibold text-text-label">Call Date Range</span> — filters by when the call <em>happened</em> in the Voice App.
+              Once pulled, calls are stored with an <span className="font-semibold text-text-label">Upload Date</span> (when they landed here).
+              The dashboard filter uses <span className="font-semibold text-text-label">Upload Date</span>.
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5 block">From Date</label>
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5 block">Call Date From</label>
               <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5 block">To Date</label>
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5 block">Call Date To</label>
               <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
           </div>
@@ -236,12 +246,19 @@ export default function UploadPage() {
 
       {/* Upload History */}
       <CardPanel title="Upload History">
+        <p className="text-xs text-text-muted mb-3">
+          <span className="font-semibold text-text-label">Upload Date</span> is when calls landed in Veyn BI — this is what the dashboard date filter uses.
+        </p>
         {loading ? <Spinner /> : batches.length === 0 ? <EmptyState message="No uploads yet" /> : (
           <div className="overflow-x-auto">
             <table className="table-container">
               <thead>
                 <tr>
-                  <th>Batch Name</th><th>Source</th><th>Eval File</th><th>Calls</th><th>Status</th><th>Uploaded</th>
+                  <th>Batch Name</th><th>Source</th><th>Eval File</th><th>Calls</th><th>Status</th>
+                  <th>
+                    <span className="text-primary-soft">Upload Date</span>
+                    <span className="block text-text-muted font-normal normal-case tracking-normal text-[10px]">use this for dashboard filter</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -252,7 +269,7 @@ export default function UploadPage() {
                     <td className="text-text-muted text-xs">{b.eval_filename || '—'}</td>
                     <td>{b.total_calls}</td>
                     <td><span className={batchStatusColor(b.status)}>{b.status}</span></td>
-                    <td className="text-text-muted text-xs">{new Date(b.created_at).toLocaleString()}</td>
+                    <td className="text-xs font-semibold text-text-main">{new Date(b.created_at).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
