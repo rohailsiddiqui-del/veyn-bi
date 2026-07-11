@@ -17,27 +17,38 @@ async function getAccessToken() {
   return token.token;
 }
 
-async function getDataContext(tenantId) {
+async function getDataContext(tenantId, dateFrom, dateTo) {
+  // Build date filter clause (upload date, same as dashboard)
+  const dateParams = [tenantId];
+  let dateWhere = '';
+  if (dateFrom) { dateParams.push(dateFrom); dateWhere += ` AND created_at::date >= $${dateParams.length}`; }
+  if (dateTo)   { dateParams.push(dateTo);   dateWhere += ` AND created_at::date <= $${dateParams.length}`; }
+
+  const insightDateParams = [tenantId];
+  let insightDateWhere = '';
+  if (dateFrom) { insightDateParams.push(dateFrom); insightDateWhere += ` AND c.created_at::date >= $${insightDateParams.length}`; }
+  if (dateTo)   { insightDateParams.push(dateTo);   insightDateWhere += ` AND c.created_at::date <= $${insightDateParams.length}`; }
+
   const [summary, agents, params, insightsSummary, topComplaints, categories] = await Promise.all([
     db.query(`
       SELECT COUNT(*) AS total_calls, ROUND(AVG(score),2) AS avg_score,
         COUNT(*) FILTER (WHERE status='ERROR FREE') AS error_free,
         COUNT(*) FILTER (WHERE status='DEFICIENT') AS deficient,
         MIN(call_date) AS date_from, MAX(call_date) AS date_to
-      FROM calls WHERE tenant_id=$1`, [tenantId]),
+      FROM calls WHERE tenant_id=$1${dateWhere}`, dateParams),
 
     db.query(`
       SELECT agent_name, COUNT(*) AS calls, ROUND(AVG(score),2) AS avg_score
-      FROM calls WHERE tenant_id=$1
-      GROUP BY agent_name ORDER BY avg_score DESC`, [tenantId]),
+      FROM calls WHERE tenant_id=$1${dateWhere}
+      GROUP BY agent_name ORDER BY avg_score DESC`, dateParams),
 
     db.query(`
       SELECT p.param_name, ROUND(AVG(p.score),2) AS avg_score,
         ROUND(COUNT(*) FILTER (WHERE p.score=0)::numeric/COUNT(*)*100,1) AS zero_pct
       FROM call_param_scores p
       JOIN calls c ON p.call_id=c.id
-      WHERE p.tenant_id=$1
-      GROUP BY p.param_name ORDER BY zero_pct DESC LIMIT 10`, [tenantId]),
+      WHERE p.tenant_id=$1${insightDateWhere}
+      GROUP BY p.param_name ORDER BY zero_pct DESC LIMIT 10`, insightDateParams),
 
     db.query(`
       SELECT
@@ -53,19 +64,24 @@ async function getDataContext(tenantId) {
         COUNT(*) FILTER (WHERE ci.social_media_mention=true) AS social_media_calls,
         COUNT(*) FILTER (WHERE ci.regulatory_mention=true) AS regulatory_calls,
         ROUND(AVG(ci.customer_talk_pct)::numeric,1) AS avg_customer_talk_pct
-      FROM call_insights ci WHERE ci.tenant_id=$1`, [tenantId]),
+      FROM call_insights ci
+      JOIN calls c ON ci.call_id = c.id
+      WHERE ci.tenant_id=$1${insightDateWhere}`, insightDateParams),
 
     db.query(`
       SELECT complaint, COUNT(*) AS frequency
-      FROM call_insights ci,
+      FROM call_insights ci
+      JOIN calls c ON ci.call_id = c.id,
       jsonb_array_elements_text(ci.top_complaints) AS complaint
-      WHERE ci.tenant_id=$1 AND ci.top_complaints != '[]'::jsonb
-      GROUP BY complaint ORDER BY frequency DESC LIMIT 8`, [tenantId]),
+      WHERE ci.tenant_id=$1${insightDateWhere} AND ci.top_complaints != '[]'::jsonb
+      GROUP BY complaint ORDER BY frequency DESC LIMIT 8`, insightDateParams),
 
     db.query(`
       SELECT ci.call_category, COUNT(*) AS count
-      FROM call_insights ci WHERE ci.tenant_id=$1 AND ci.call_category IS NOT NULL
-      GROUP BY ci.call_category ORDER BY count DESC LIMIT 6`, [tenantId]),
+      FROM call_insights ci
+      JOIN calls c ON ci.call_id = c.id
+      WHERE ci.tenant_id=$1${insightDateWhere} AND ci.call_category IS NOT NULL
+      GROUP BY ci.call_category ORDER BY count DESC LIMIT 6`, insightDateParams),
   ]);
 
   return {
@@ -80,22 +96,28 @@ async function getDataContext(tenantId) {
 
 router.post('/', async (req, res) => {
   const { tenantId } = req.user;
-  const { message, history = [] } = req.body;
+  const { message, history = [], dateFrom = null, dateTo = null } = req.body;
 
   if (!message) return res.status(400).json({ error: 'Message required' });
 
   try {
-    const ctx = await getDataContext(tenantId);
+    const ctx = await getDataContext(tenantId, dateFrom, dateTo);
     const ins = ctx.insights;
 
     const resRate = ins && ins.total_analysed > 0
       ? Math.round(ins.resolved_calls / ins.total_analysed * 100) : null;
 
+    const dateRangeLabel = dateFrom || dateTo
+      ? `Upload date filter active: ${dateFrom || 'any'} → ${dateTo || 'any'}`
+      : 'No date filter — showing all data';
+
     const systemPrompt = `You are a CX Analytics AI assistant. You have access to call center QA evaluation data and AI-extracted call insights.
+
+${dateRangeLabel}
 
 === QA SCORES ===
 - Total calls: ${ctx.summary.total_calls}
-- Date range: ${ctx.summary.date_from} to ${ctx.summary.date_to}
+- Call date range in data: ${ctx.summary.date_from} to ${ctx.summary.date_to}
 - Average score: ${ctx.summary.avg_score}/100
 - Error Free: ${ctx.summary.error_free} | Deficient: ${ctx.summary.deficient}
 

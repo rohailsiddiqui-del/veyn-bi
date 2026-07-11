@@ -65,7 +65,7 @@ function TypingIndicator() {
 }
 
 export default function ChatPage() {
-  const { apiFetch, token } = useAuth();
+  const { apiFetch, token, globalDateFrom, globalDateTo } = useAuth();
   const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -98,7 +98,7 @@ export default function ChatPage() {
       const data = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({ message: text, history, dateFrom: globalDateFrom || null, dateTo: globalDateTo || null }),
       });
 
       const reply = data.reply ?? data.message ?? data.text ?? JSON.stringify(data);
@@ -143,9 +143,17 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Page header */}
-      <div className="flex-shrink-0 mb-4">
-        <h1 className="text-2xl font-bold text-text-main tracking-tight">AI Chat</h1>
-        <p className="text-sm text-text-muted mt-0.5">Ask Veyn AI about your call analytics</p>
+      <div className="flex-shrink-0 mb-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-main tracking-tight">AI Chat</h1>
+          <p className="text-sm text-text-muted mt-0.5">Ask Veyn AI about your call analytics</p>
+        </div>
+        {(globalDateFrom || globalDateTo) && (
+          <div className="text-xs px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary-soft">
+            Filtered: {globalDateFrom || '…'} → {globalDateTo || '…'}
+            <span className="block text-text-muted font-normal">upload date range active</span>
+          </div>
+        )}
       </div>
 
       {/* Gemini API key warning banner */}
