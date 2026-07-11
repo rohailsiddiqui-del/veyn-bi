@@ -141,7 +141,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 160px)', minHeight: 400 }}>
       {/* Page header */}
       <div className="flex-shrink-0 mb-4 flex items-start justify-between">
         <div>
@@ -169,7 +169,7 @@ export default function ChatPage() {
       )}
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-surface/50 p-5 space-y-5 min-h-0">
+      <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-bg p-5 space-y-5 min-h-0">
         {messages.map((msg) =>
           msg.role === 'user' ? (
             <UserBubble key={msg.id} text={msg.text} />
@@ -192,25 +192,26 @@ export default function ChatPage() {
           placeholder="Ask anything about your call data… (Enter to send, Shift+Enter for new line)"
           rows={2}
           disabled={typing}
-          className="flex-1 resize-none bg-surface border border-border2 rounded-xl py-3 px-4 text-sm text-text-main placeholder-text-muted outline-none transition-colors focus:border-primary disabled:opacity-50"
-          style={{ maxHeight: 140 }}
+          style={{ maxHeight: 140, backgroundColor: '#1e2130', color: '#e2e8f0', border: '1px solid #334155', borderRadius: 12, padding: '12px 16px', fontSize: 14, resize: 'none', outline: 'none', flex: 1 }}
         />
-        <Button
+        <button
           id="chat-send-btn"
-          variant="primary"
           onClick={sendMessage}
           disabled={typing || !input.trim()}
-          className="h-12 px-5 rounded-xl flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{
+            height: 48, padding: '0 24px', borderRadius: 12, flexShrink: 0,
+            backgroundColor: typing || !input.trim() ? '#334155' : '#6366f1',
+            color: '#ffffff', border: 'none', cursor: typing || !input.trim() ? 'not-allowed' : 'pointer',
+            fontWeight: 600, fontSize: 14, transition: 'background-color 0.15s',
+          }}
         >
           {typing ? (
-            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" style={{ display: 'inline' }}>
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-          ) : (
-            'Send'
-          )}
-        </Button>
+          ) : 'Send'}
+        </button>
       </div>
 
       {/* Bounce animation keyframes injected inline */}
@@ -219,6 +220,8 @@ export default function ChatPage() {
           0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
           40% { transform: translateY(-6px); opacity: 1; }
         }
+        #chat-input:focus { border-color: #6366f1 !important; }
+        #chat-input::placeholder { color: #64748b; }
       `}</style>
     </div>
   );
