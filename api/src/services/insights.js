@@ -71,7 +71,24 @@ function smartTruncate(text, max = 12000) {
 }
 
 async function extractInsights(transcriptText, industry = 'generic') {
-  if (!transcriptText) transcriptText = '';
+  // No transcript — return zeroed insight instead of hallucinating
+  if (!transcriptText || transcriptText.trim().length === 0) {
+    return {
+      call_category: 'Unknown', call_subcategory: null, call_outcome: 'Unknown',
+      customer_sentiment: { overall: 'Unknown', score: 0, emotions: [] },
+      agent_sentiment: { overall: 'Unknown', score: 0, tone_consistency: 'Unknown' },
+      top_complaints: [],
+      signal_intelligence: {
+        threat_detected: false, threat_details: null,
+        social_media_mention: false, social_media_details: null,
+        escalation_request: false, escalation_details: null,
+        regulatory_mention: false, regulatory_details: null
+      },
+      key_moments: [], location_mentioned: null, product_mentions: [],
+      talk_time: { customer_pct: 0, agent_pct: 0 },
+      summary: null
+    };
+  }
   transcriptText = smartTruncate(transcriptText);
 
   const industryContext = getIndustryPrompt(industry);
