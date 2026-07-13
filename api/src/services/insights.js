@@ -63,6 +63,11 @@ Extract and return a JSON object with EXACTLY this structure (no extra keys, no 
   },
   "summary": "string — 2-3 sentence plain English summary of the call"
 }
+
+CRITICAL RULES — follow these without exception:
+- If the transcript is empty, too short, or contains no real conversation, return all signal_intelligence fields as false/null and summary as null. Do NOT invent or assume any conversation content.
+- Only flag threat_detected, social_media_mention, escalation_request, or regulatory_mention as true if there is explicit, verbatim evidence in the transcript. Never infer or assume.
+- If you are not certain, default to false.
 `;
 
 function smartTruncate(text, max = 12000) {
@@ -71,8 +76,8 @@ function smartTruncate(text, max = 12000) {
 }
 
 async function extractInsights(transcriptText, industry = 'generic') {
-  // No transcript — return zeroed insight instead of hallucinating
-  if (!transcriptText || transcriptText.trim().length === 0) {
+  // No transcript or too short to be meaningful — return zeroed insight instead of hallucinating
+  if (!transcriptText || transcriptText.trim().length < 100) {
     return {
       call_category: 'Unknown', call_subcategory: null, call_outcome: 'Unknown',
       customer_sentiment: { overall: 'Unknown', score: 0, emotions: [] },
