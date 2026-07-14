@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const auth = require('./middleware/auth');
+const adminAuth = require('./middleware/adminAuth');
 
 const app = express();
 app.use(cors());
@@ -17,6 +18,9 @@ app.use('/api/analytics', auth, require('./routes/analytics'));
 app.use('/api/insights',  auth, require('./routes/insights'));
 app.use('/api/chat',      auth, require('./routes/chat'));
 app.use('/api/settings',  auth, require('./routes/settings'));
+
+// Superadmin routes
+app.use('/api/admin', auth, adminAuth, require('./routes/admin'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));

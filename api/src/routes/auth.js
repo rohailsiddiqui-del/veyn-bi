@@ -32,7 +32,7 @@ router.post('/login', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
   try {
     const userRes = await db.query(
-      `SELECT u.*, t.name as tenant_name, t.slug, t.industry
+      `SELECT u.*, t.name as tenant_name, t.slug, t.industry, t.dashboard_mode
        FROM users u JOIN tenants t ON u.tenant_id = t.id
        WHERE u.email = $1 AND u.is_active = true`,
       [email]
@@ -48,7 +48,13 @@ router.post('/login', async (req, res) => {
     );
     res.json({
       token,
-      user: { email: user.email, role: user.role, tenantName: user.tenant_name, industry: user.industry }
+      user: {
+        email: user.email,
+        role: user.role,
+        tenantName: user.tenant_name,
+        industry: user.industry,
+        dashboard_mode: user.dashboard_mode || 'standard',
+      }
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

@@ -14,6 +14,7 @@ import InsightsPage from './pages/InsightsPage';
 import ChatPage from './pages/ChatPage';
 import UploadPage from './pages/UploadPage';
 import AlertSettingsPage from './pages/AlertSettingsPage';
+import AdminPage from './pages/AdminPage';
 import { Spinner } from './components/ui';
 
 export default function AppShell() {
@@ -59,6 +60,7 @@ export default function AppShell() {
       case 'chat': return <ChatPage />;
       case 'upload': return <UploadPage />;
       case 'settings': return <AlertSettingsPage />;
+      case 'admin': return <AdminPage />;
       default: return <OverviewPage />;
     }
   };

@@ -5,7 +5,7 @@ import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui';
 import {
   LayoutDashboard, Users, Target, TrendingUp, Brain, MessageSquare,
-  Upload, Bell, LogOut, Moon, Sun, Download, ChevronDown,
+  Upload, Bell, LogOut, Moon, Sun, Download, ChevronDown, ShieldCheck,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -103,6 +103,20 @@ export default function Sidebar({ activePage, onNavigate }) {
             <span>{label}</span>
           </button>
         ))}
+
+        {/* Superadmin only */}
+        {user?.role === 'superadmin' && (
+          <>
+            <div className="my-2 border-t border-border" />
+            <button
+              onClick={() => onNavigate('admin')}
+              className={cn('nav-item w-full text-left mb-0.5', activePage === 'admin' && 'active')}
+            >
+              <ShieldCheck size={16} className="flex-shrink-0" />
+              <span>Admin</span>
+            </button>
+          </>
+        )}
       </nav>
 
       {/* Bottom section */}
