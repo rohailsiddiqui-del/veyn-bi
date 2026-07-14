@@ -399,9 +399,9 @@ export default function InsightsPage() {
       {/* ── 2. KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Analysed Calls"
+          label="Total Calls"
           value={summary?.total_analysed ?? '—'}
-          sub="Total calls processed"
+          sub="All evaluated calls"
           accent="purple"
         />
         <KpiCard
