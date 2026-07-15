@@ -489,14 +489,23 @@ router.post('/insights/process', async (req, res) => {
             escalation_request, escalation_details,
             regulatory_mention, regulatory_details,
             top_complaints, key_moments, product_mentions,
-            location_mentioned, customer_talk_pct, summary
+            location_mentioned, customer_talk_pct, summary, error
           )
           SELECT $1, c.id, $2,
-            $3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+            $3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NULL
           FROM cases c
           JOIN case_interactions ci ON ci.id = $2
           WHERE c.id = ci.case_id
-          ON CONFLICT DO NOTHING
+          ON CONFLICT (interaction_id) DO UPDATE SET
+            call_category=$3, call_subcategory=$4, call_outcome=$5,
+            customer_sentiment_overall=$6, customer_sentiment_score=$7,
+            agent_sentiment_overall=$8, agent_sentiment_score=$9,
+            threat_detected=$10, threat_details=$11,
+            social_media_mention=$12, social_media_details=$13,
+            escalation_request=$14, escalation_details=$15,
+            regulatory_mention=$16, regulatory_details=$17,
+            top_complaints=$18, key_moments=$19, product_mentions=$20,
+            location_mentioned=$21, customer_talk_pct=$22, summary=$23, error=NULL
         `, [
           tenantId, row.id,
           result.call_category || null,
