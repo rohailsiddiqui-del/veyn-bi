@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { KpiCard, CardPanel, Badge, Button, Select, Spinner, EmptyState } from '@/app/components/ui';
+import { Phone, MessageSquare } from 'lucide-react';
 import { DoughnutChart, BarChart } from '@/app/components/Charts';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -215,6 +216,8 @@ export default function InsightsPage() {
   const [processStatus, setProcessStatus]   = useState('');
   const [expandedCallId, setExpandedCallId] = useState(null);
   const [deletingCallId, setDeletingCallId] = useState(null);
+  // case-mode channel filter: null = all, 'voice', 'whatsapp'
+  const [channelFilter, setChannelFilter]   = useState(null);
 
   // ── delete a single call ──
   const deleteCall = useCallback(async (callId, e) => {
@@ -239,12 +242,13 @@ export default function InsightsPage() {
       if (type && type !== 'all') params.append('type', type);
       if (globalDateFrom) { params.append('from', globalDateFrom); }
       if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
+      if (isCaseMode && channelFilter) params.append('channel', channelFilter);
       const qs = params.toString();
-      const endpoint = isCaseMode ? `/api/cases/insights/all` : `/api/insights/signals${qs ? '?' + qs : ''}`;
+      const endpoint = isCaseMode ? `/api/cases/insights/all${qs ? '?' + qs : ''}` : `/api/insights/signals${qs ? '?' + qs : ''}`;
       const data = await apiFetch(endpoint);
       setSignals(Array.isArray(data) ? data : data.signals ?? []);
     } catch (_) {}
-  }, [apiFetch, globalDateFrom, globalDateTo]);
+  }, [apiFetch, globalDateFrom, globalDateTo, isCaseMode, channelFilter]);
 
   // ── initial fetch — single aggregated call ──
   useEffect(() => {
@@ -255,9 +259,10 @@ export default function InsightsPage() {
     const qp = new URLSearchParams();
     if (globalDateFrom) { qp.append('from', globalDateFrom); }
     if (globalDateTo)   { qp.append('to', globalDateTo + ' 23:59:59'); }
+    if (isCaseMode && channelFilter) qp.append('channel', channelFilter);
     const qs = qp.toString() ? `?${qp.toString()}` : '';
 
-    apiFetch(isCaseMode ? `/api/cases/insights/all` : `/api/insights/all${qs}`)
+    apiFetch(isCaseMode ? `/api/cases/insights/all${qs}` : `/api/insights/all${qs}`)
       .then((d) => {
         if (cancelled) return;
         if (d.summary)         setSummary(d.summary);
@@ -277,7 +282,7 @@ export default function InsightsPage() {
       });
 
     return () => { cancelled = true; };
-  }, [apiFetch, globalDateFrom, globalDateTo]);
+  }, [apiFetch, globalDateFrom, globalDateTo, isCaseMode, channelFilter]);
 
   // ── signal filters (table) ──
   useEffect(() => {
@@ -394,6 +399,30 @@ export default function InsightsPage() {
         </div>
       </div>
 
+      {/* ── Channel Filter Tabs (case-mode only) ── */}
+      {isCaseMode && (
+        <div className="flex gap-1 bg-surface border border-border rounded-xl p-1 w-fit">
+          {[
+            { key: null,         label: 'All Channels', Icon: null },
+            { key: 'voice',      label: 'Voice',        Icon: Phone },
+            { key: 'whatsapp',   label: 'WhatsApp',     Icon: MessageSquare },
+          ].map(({ key, label, Icon }) => (
+            <button
+              key={String(key)}
+              onClick={() => { setChannelFilter(key); setSignalFilter(null); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                channelFilter === key
+                  ? 'bg-primary/20 text-primary-soft font-semibold'
+                  : 'text-text-muted hover:text-text-main'
+              }`}
+            >
+              {Icon && <Icon size={12} />}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="rounded-xl border border-danger/30 bg-danger/10 px-5 py-3 text-sm text-danger">{error}</div>
       )}
@@ -401,9 +430,11 @@ export default function InsightsPage() {
       {/* ── 2. KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Total Calls"
+          label={isCaseMode ? 'Interactions' : 'Total Calls'}
           value={summary?.total_analysed ?? '—'}
-          sub="All evaluated calls"
+          sub={isCaseMode
+            ? (channelFilter ? `${channelFilter.charAt(0).toUpperCase() + channelFilter.slice(1)} interactions` : 'All channels')
+            : 'All evaluated calls'}
           accent="purple"
         />
         <KpiCard
@@ -487,7 +518,7 @@ export default function InsightsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border">
-                  {['Call Ref', 'Agent', 'Date', 'Category', 'Flags', 'Sentiment', 'Details', ''].map((h) => (
+                  {[isCaseMode ? 'Case Ref' : 'Call Ref', 'Agent', isCaseMode ? 'Channel' : 'Date', 'Category', 'Flags', 'Sentiment', 'Details', ''].map((h) => (
                     <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-widest py-2 px-3">
                       {h}
                     </th>
@@ -503,12 +534,18 @@ export default function InsightsPage() {
                   if (sig.social_media_mention) flags.push('social');
                   if (sig.escalation_request) flags.push('escalation');
                   if (sig.regulatory_mention) flags.push('regulatory');
-                  
+
                   const sentiment = sig.customer_sentiment_overall ?? sig.sentiment;
                   const sentColor =
                     sentiment?.toLowerCase?.() === 'positive' ? 'text-green-400' :
                     sentiment?.toLowerCase?.() === 'negative' ? 'text-red-400' :
                     'text-amber-400';
+
+                  const chanIcon = sig.channel?.toLowerCase?.() === 'voice'
+                    ? <Phone size={12} className="inline mr-1 text-text-muted" />
+                    : sig.channel?.toLowerCase?.() === 'whatsapp'
+                    ? <MessageSquare size={12} className="inline mr-1 text-text-muted" />
+                    : null;
 
                   return (
                     <Fragment key={id}>
@@ -521,7 +558,9 @@ export default function InsightsPage() {
                         <td className="py-3 px-3 font-mono text-text-muted text-xs">{sig.call_ref ?? sig.callRef ?? id}</td>
                         <td className="py-3 px-3 text-text-main font-medium">{sig.agent_name ?? sig.agent ?? '—'}</td>
                         <td className="py-3 px-3 text-text-muted">
-                          {sig.call_date ? new Date(sig.call_date).toLocaleDateString() : '—'}
+                          {isCaseMode
+                            ? <span className="flex items-center gap-1">{chanIcon}{sig.channel ?? '—'}</span>
+                            : (sig.call_date ? new Date(sig.call_date).toLocaleDateString() : '—')}
                         </td>
                         <td className="py-3 px-3 text-text-muted">{sig.call_category ?? sig.category ?? '—'}</td>
                         <td className="py-3 px-3">

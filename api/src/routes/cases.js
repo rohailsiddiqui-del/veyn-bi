@@ -510,42 +510,54 @@ router.post('/insights/process', async (req, res) => {
 });
 
 // GET /api/cases/insights/all — same shape as /api/insights/all but from case tables
+// Supports ?channel=voice|whatsapp to filter by interaction channel
 router.get('/insights/all', async (req, res) => {
   const tenantId = req.user.tenantId;
+  const channel = req.query.channel ? req.query.channel.toLowerCase() : null;
+
+  // All queries join case_interactions (ci), so we filter on LOWER(ci.channel)
+  const chanClause = channel ? `AND LOWER(ci.channel) = $2` : '';
+
+  const params1 = channel ? [tenantId, channel] : [tenantId];
+
   try {
     const [summary, categories, signals, complaints, moments, sentimentByAgent] = await Promise.all([
       pool.query(`
         SELECT
-          (SELECT COUNT(*) FROM case_interactions WHERE tenant_id=$1) AS total_analysed,
-          COUNT(*) FILTER (WHERE cins.error IS NULL) AS success_count,
-          COUNT(*) FILTER (WHERE cins.threat_detected=true) AS threat_calls,
-          COUNT(*) FILTER (WHERE cins.social_media_mention=true) AS social_media_calls,
-          COUNT(*) FILTER (WHERE cins.escalation_request=true) AS escalation_calls,
-          COUNT(*) FILTER (WHERE cins.regulatory_mention=true) AS regulatory_calls,
-          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive_calls,
-          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative_calls,
-          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Neutral') AS neutral_calls,
-          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Mixed') AS mixed_calls,
+          COUNT(DISTINCT ci.id) AS total_analysed,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.error IS NULL) AS success_count,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.threat_detected=true) AS threat_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.social_media_mention=true) AS social_media_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.escalation_request=true) AS escalation_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.regulatory_mention=true) AS regulatory_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.customer_sentiment_overall='Neutral') AS neutral_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.customer_sentiment_overall='Mixed') AS mixed_calls,
           ROUND(AVG(cins.customer_sentiment_score)::numeric,2) AS avg_customer_sentiment,
           ROUND(AVG(cins.agent_sentiment_score)::numeric,2) AS avg_agent_sentiment,
           ROUND(AVG(cins.customer_talk_pct)::numeric,1) AS avg_customer_talk_pct,
-          COUNT(*) FILTER (WHERE cins.call_outcome='Resolved') AS resolved_calls,
-          COUNT(*) FILTER (WHERE cins.call_outcome='Unresolved') AS unresolved_calls,
-          COUNT(*) FILTER (WHERE cins.call_outcome='Escalated') AS escalated_calls
-        FROM case_insights cins
-        WHERE cins.tenant_id=$1
-      `, [tenantId]),
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.call_outcome='Resolved') AS resolved_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.call_outcome='Unresolved') AS unresolved_calls,
+          COUNT(DISTINCT cins.id) FILTER (WHERE cins.call_outcome='Escalated') AS escalated_calls
+        FROM case_interactions ci
+        LEFT JOIN case_insights cins ON cins.interaction_id = ci.id
+        WHERE ci.tenant_id=$1 ${chanClause}
+      `, params1),
 
       pool.query(`
-        SELECT call_category, call_subcategory, COUNT(*) AS count,
-          ROUND(AVG(customer_sentiment_score)::numeric,2) AS avg_sentiment
-        FROM case_insights WHERE tenant_id=$1 AND call_category IS NOT NULL
-        GROUP BY call_category, call_subcategory ORDER BY count DESC
-      `, [tenantId]),
+        SELECT cins.call_category, cins.call_subcategory, COUNT(*) AS count,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,2) AS avg_sentiment
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1 AND cins.call_category IS NOT NULL ${chanClause}
+        GROUP BY cins.call_category, cins.call_subcategory ORDER BY count DESC
+      `, params1),
 
       pool.query(`
         SELECT
           ci.id AS call_id, ci.case_number AS call_ref, ci.agent_name, ci.created_at AS call_date,
+          ci.channel,
           cins.call_category, cins.call_outcome,
           cins.threat_detected, cins.threat_details,
           cins.social_media_mention, cins.social_media_details,
@@ -557,22 +569,27 @@ router.get('/insights/all', async (req, res) => {
         WHERE cins.tenant_id=$1
           AND (cins.threat_detected=true OR cins.social_media_mention=true
                OR cins.escalation_request=true OR cins.regulatory_mention=true)
+          ${chanClause}
         ORDER BY ci.created_at DESC LIMIT 100
-      `, [tenantId]),
+      `, params1),
 
       pool.query(`
         SELECT complaint, COUNT(*) AS frequency
-        FROM case_insights, jsonb_array_elements_text(top_complaints) AS complaint
-        WHERE tenant_id=$1 AND top_complaints != '[]'::jsonb
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id,
+          jsonb_array_elements_text(cins.top_complaints) AS complaint
+        WHERE cins.tenant_id=$1 AND cins.top_complaints != '[]'::jsonb ${chanClause}
         GROUP BY complaint ORDER BY frequency DESC LIMIT 15
-      `, [tenantId]),
+      `, params1),
 
       pool.query(`
         SELECT moment->>'type' AS moment_type, COUNT(*) AS frequency
-        FROM case_insights, jsonb_array_elements(key_moments) AS moment
-        WHERE tenant_id=$1 AND key_moments != '[]'::jsonb
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id,
+          jsonb_array_elements(cins.key_moments) AS moment
+        WHERE cins.tenant_id=$1 AND cins.key_moments != '[]'::jsonb ${chanClause}
         GROUP BY moment->>'type' ORDER BY frequency DESC
-      `, [tenantId]),
+      `, params1),
 
       pool.query(`
         SELECT ci.agent_name,
@@ -585,9 +602,9 @@ router.get('/insights/all', async (req, res) => {
           COUNT(*) FILTER (WHERE cins.threat_detected=true) AS threats
         FROM case_insights cins
         JOIN case_interactions ci ON ci.id = cins.interaction_id
-        WHERE cins.tenant_id=$1
+        WHERE cins.tenant_id=$1 ${chanClause}
         GROUP BY ci.agent_name ORDER BY avg_customer_sentiment DESC
-      `, [tenantId]),
+      `, params1),
     ]);
 
     res.json({
