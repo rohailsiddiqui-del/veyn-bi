@@ -5,7 +5,7 @@ import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui';
 import {
   LayoutDashboard, Users, Target, TrendingUp, Brain, MessageSquare,
-  Upload, Bell, LogOut, Moon, Sun, Download, ChevronDown, ShieldCheck,
+  Upload, Bell, LogOut, Moon, Sun, Download, ChevronDown, ShieldCheck, GitBranch,
 } from 'lucide-react';
 
 const NAV_ITEMS = [

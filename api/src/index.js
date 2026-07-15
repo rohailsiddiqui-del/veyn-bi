@@ -21,6 +21,7 @@ app.use('/api/settings',  auth, require('./routes/settings'));
 
 // Superadmin routes
 app.use('/api/admin', auth, adminAuth, require('./routes/admin'));
+app.use('/api/cases',    auth, require('./routes/cases'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
