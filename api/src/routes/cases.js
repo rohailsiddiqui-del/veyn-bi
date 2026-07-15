@@ -613,11 +613,22 @@ router.get('/insights/all', async (req, res) => {
       `, params1),
 
       pool.query(`
-        SELECT complaint, COUNT(*) AS frequency
+        SELECT
+          CASE
+            WHEN cins.call_subcategory ILIKE '%refund%' OR cins.call_subcategory ILIKE '%cancel%' THEN 'Refund / Cancellation'
+            WHEN cins.call_subcategory ILIKE '%modif%' OR cins.call_subcategory ILIKE '%change%' OR cins.call_subcategory ILIKE '%amend%' OR cins.call_subcategory ILIKE '%date change%' THEN 'Booking Modification'
+            WHEN cins.call_subcategory ILIKE '%baggage%' OR cins.call_subcategory ILIKE '%luggage%' THEN 'Baggage'
+            WHEN cins.call_subcategory ILIKE '%hotel%' THEN 'Hotel Issue'
+            WHEN cins.call_subcategory ILIKE '%boarding%' OR cins.call_subcategory ILIKE '%check-in%' OR cins.call_subcategory ILIKE '%check in%' THEN 'Check-in / Boarding'
+            WHEN cins.call_subcategory ILIKE '%flight%' OR cins.call_subcategory ILIKE '%ticket%' THEN 'Flight Issue'
+            WHEN cins.call_subcategory ILIKE '%name%' OR cins.call_subcategory ILIKE '%typo%' OR cins.call_subcategory ILIKE '%passenger%' THEN 'Passenger Details'
+            WHEN cins.call_subcategory ILIKE '%billing%' OR cins.call_subcategory ILIKE '%payment%' OR cins.call_subcategory ILIKE '%charge%' THEN 'Billing / Payment'
+            ELSE 'Other'
+          END AS complaint,
+          COUNT(*) AS frequency
         FROM case_insights cins
-        JOIN case_interactions ci ON ci.id = cins.interaction_id,
-          jsonb_array_elements_text(cins.top_complaints) AS complaint
-        WHERE cins.tenant_id=$1 AND cins.top_complaints != '[]'::jsonb ${chanClause}
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1 AND cins.call_subcategory IS NOT NULL AND cins.call_subcategory <> '' ${chanClause}
         GROUP BY complaint ORDER BY frequency DESC LIMIT 15
       `, params1),
 
@@ -646,11 +657,23 @@ router.get('/insights/all', async (req, res) => {
       `, params1),
 
       pool.query(`
-        SELECT cins.call_subcategory AS product_type, COUNT(*) AS count
+        SELECT
+          CASE
+            WHEN cins.call_subcategory ILIKE '%refund%' OR cins.call_subcategory ILIKE '%cancel%' THEN 'Refund / Cancellation'
+            WHEN cins.call_subcategory ILIKE '%modif%' OR cins.call_subcategory ILIKE '%change%' OR cins.call_subcategory ILIKE '%amend%' OR cins.call_subcategory ILIKE '%date change%' THEN 'Booking Modification'
+            WHEN cins.call_subcategory ILIKE '%baggage%' OR cins.call_subcategory ILIKE '%luggage%' THEN 'Baggage'
+            WHEN cins.call_subcategory ILIKE '%hotel%' THEN 'Hotel Issue'
+            WHEN cins.call_subcategory ILIKE '%boarding%' OR cins.call_subcategory ILIKE '%check-in%' OR cins.call_subcategory ILIKE '%check in%' THEN 'Check-in / Boarding'
+            WHEN cins.call_subcategory ILIKE '%flight%' OR cins.call_subcategory ILIKE '%ticket%' THEN 'Flight Issue'
+            WHEN cins.call_subcategory ILIKE '%name%' OR cins.call_subcategory ILIKE '%typo%' OR cins.call_subcategory ILIKE '%passenger%' THEN 'Passenger Details'
+            WHEN cins.call_subcategory ILIKE '%billing%' OR cins.call_subcategory ILIKE '%payment%' OR cins.call_subcategory ILIKE '%charge%' THEN 'Billing / Payment'
+            ELSE 'Other'
+          END AS product_type,
+          COUNT(*) AS count
         FROM case_insights cins
         JOIN case_interactions ci ON ci.id = cins.interaction_id
-        WHERE cins.tenant_id=$1 AND cins.call_subcategory IS NOT NULL AND cins.call_subcategory != '' ${chanClause}
-        GROUP BY cins.call_subcategory ORDER BY count DESC LIMIT 10
+        WHERE cins.tenant_id=$1 AND cins.call_subcategory IS NOT NULL AND cins.call_subcategory <> '' ${chanClause}
+        GROUP BY product_type ORDER BY count DESC
       `, params1),
     ]);
 
