@@ -99,7 +99,7 @@ const SIGNAL_TYPE_MAP = {
 
 // ─── expanded call row ───────────────────────────────────────────────────────
 
-function ExpandedCall({ callId }) {
+function ExpandedCall({ callId, caseMode }) {
   const { apiFetch } = useAuth();
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -109,19 +109,30 @@ function ExpandedCall({ callId }) {
     let cancelled = false;
     setLoading(true);
     setErr(null);
-    apiFetch(`/api/insights/call/${callId}/full`)
+    const endpoint = caseMode
+      ? `/api/cases/insights/interaction/${callId}`
+      : `/api/insights/call/${callId}/full`;
+    apiFetch(endpoint)
       .then((d) => { if (!cancelled) { setDetail(d); setLoading(false); } })
       .catch((e) => { if (!cancelled) { setErr(e.message); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [callId, apiFetch]);
+  }, [callId, caseMode, apiFetch]);
 
   if (loading) return <div className="py-4"><Spinner /></div>;
   if (err) return <div className="py-3 text-sm text-danger">Failed to load: {err}</div>;
   if (!detail) return null;
 
-  const insight = detail.insight || {};
-  const transcriptStr = detail.transcript?.translation_text ?? detail.transcript?.transcription_text ?? insight.transcript;
-  const moments = insight.moments ?? insight.keyMoments ?? insight.key_moments ?? [];
+  // Case mode: flat row from case_interactions + case_insights join
+  // Standard mode: { insight: {}, transcript: {} } shape
+  const insight = caseMode ? detail : (detail.insight || {});
+  const transcriptStr = caseMode
+    ? (detail.translation || detail.transcript || null)
+    : (detail.transcript?.translation_text ?? detail.transcript?.transcription_text ?? insight.transcript);
+  const moments = (() => {
+    const raw = insight.key_moments ?? insight.moments ?? insight.keyMoments ?? [];
+    if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return []; } }
+    return Array.isArray(raw) ? raw : [];
+  })();
 
   return (
     <div className="space-y-4 text-sm">
@@ -599,7 +610,7 @@ export default function InsightsPage() {
                       {isExpanded && (
                         <tr key={`expanded-${id}`} className="bg-surface/50">
                           <td colSpan={8} className="px-5 py-4 border-b border-border">
-                            <ExpandedCall callId={id} />
+                            <ExpandedCall callId={id} caseMode={isCaseMode} />
                           </td>
                         </tr>
                       )}

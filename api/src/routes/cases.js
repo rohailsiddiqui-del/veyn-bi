@@ -420,6 +420,36 @@ router.get('/agents/performance', async (req, res) => {
   }
 });
 
+// GET /api/cases/insights/interaction/:interactionId — full detail for expanded row
+router.get('/insights/interaction/:interactionId', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  const { interactionId } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT
+        ci.id, ci.case_number, ci.agent_name, ci.channel,
+        ci.transcript, ci.translation,
+        cins.call_category, cins.call_subcategory, cins.call_outcome,
+        cins.customer_sentiment_overall, cins.customer_sentiment_score,
+        cins.agent_sentiment_overall,
+        cins.threat_detected, cins.threat_details,
+        cins.social_media_mention, cins.social_media_details,
+        cins.escalation_request, cins.escalation_details,
+        cins.regulatory_mention, cins.regulatory_details,
+        cins.top_complaints, cins.key_moments,
+        cins.location_mentioned, cins.summary
+      FROM case_interactions ci
+      LEFT JOIN case_insights cins ON cins.interaction_id = ci.id
+      WHERE ci.tenant_id = $1 AND ci.id = $2
+    `, [tenantId, interactionId]);
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/cases/insights/process — run AI on case interaction translations
 router.post('/insights/process', async (req, res) => {
   const tenantId = req.user.tenantId;
