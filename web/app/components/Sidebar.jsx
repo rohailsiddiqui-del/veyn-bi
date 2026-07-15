@@ -90,24 +90,9 @@ export default function Sidebar({ activePage, onNavigate }) {
 
       {/* Nav */}
       <nav className="flex-1 p-3 overflow-y-auto">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => onNavigate(id)}
-            className={cn(
-              'nav-item w-full text-left mb-0.5',
-              activePage === id && 'active'
-            )}
-          >
-            <Icon size={16} className="flex-shrink-0" />
-            <span>{label}</span>
-          </button>
-        ))}
-
-        {/* Case-mode tenants only */}
-        {user?.dashboard_mode === 'case' && (
+        {user?.dashboard_mode === 'case' ? (
+          /* Case-mode: only Case Trajectory + Insights */
           <>
-            <div className="my-2 border-t border-border" />
             <button
               onClick={() => onNavigate('cases')}
               className={cn('nav-item w-full text-left mb-0.5', activePage === 'cases' && 'active')}
@@ -115,7 +100,26 @@ export default function Sidebar({ activePage, onNavigate }) {
               <GitBranch size={16} className="flex-shrink-0" />
               <span>Case Trajectory</span>
             </button>
+            <button
+              onClick={() => onNavigate('insights')}
+              className={cn('nav-item w-full text-left mb-0.5', activePage === 'insights' && 'active')}
+            >
+              <Brain size={16} className="flex-shrink-0" />
+              <span>Insights</span>
+            </button>
           </>
+        ) : (
+          /* Standard mode: full nav */
+          NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => onNavigate(id)}
+              className={cn('nav-item w-full text-left mb-0.5', activePage === id && 'active')}
+            >
+              <Icon size={16} className="flex-shrink-0" />
+              <span>{label}</span>
+            </button>
+          ))
         )}
 
         {/* Superadmin only */}

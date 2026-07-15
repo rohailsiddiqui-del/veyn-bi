@@ -551,7 +551,7 @@ router.get('/insights/all', async (req, res) => {
   const params1 = channel ? [tenantId, channel] : [tenantId];
 
   try {
-    const [summary, categories, signals, complaints, moments, sentimentByAgent] = await Promise.all([
+    const [summary, categories, signals, complaints, moments, sentimentByAgent, productTypes] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(DISTINCT ci.id) AS total_analysed,
@@ -635,6 +635,14 @@ router.get('/insights/all', async (req, res) => {
         WHERE cins.tenant_id=$1 ${chanClause}
         GROUP BY ci.agent_name ORDER BY avg_customer_sentiment DESC
       `, params1),
+
+      pool.query(`
+        SELECT cins.call_subcategory AS product_type, COUNT(*) AS count
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1 AND cins.call_subcategory IS NOT NULL AND cins.call_subcategory != '' ${chanClause}
+        GROUP BY cins.call_subcategory ORDER BY count DESC LIMIT 10
+      `, params1),
     ]);
 
     res.json({
@@ -644,6 +652,7 @@ router.get('/insights/all', async (req, res) => {
       complaints: complaints.rows,
       moments: moments.rows,
       sentimentByAgent: sentimentByAgent.rows,
+      productTypes: productTypes.rows,
       locations: [],
       products: [],
     });

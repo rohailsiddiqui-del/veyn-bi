@@ -217,6 +217,7 @@ export default function InsightsPage() {
   const [sentimentByAgent, setSentimentByAgent] = useState([]);
   const [locations, setLocations]           = useState([]);
   const [products, setProducts]             = useState([]);
+  const [productTypes, setProductTypes]     = useState([]);
 
   // ── UI state ──
   const [loading, setLoading]               = useState(true);
@@ -284,6 +285,7 @@ export default function InsightsPage() {
         if (d.sentimentByAgent) setSentimentByAgent(d.sentimentByAgent);
         if (d.locations)       setLocations(d.locations);
         if (d.products)        setProducts(d.products);
+        if (d.productTypes)    setProductTypes(d.productTypes);
         setLoading(false);
       })
       .catch((e) => {
@@ -349,6 +351,16 @@ export default function InsightsPage() {
   const locCounts    = locations.slice(0, 12).map((l) => Number(l.call_count ?? l.count ?? 0));
   const prodLabels   = products.slice(0, 12).map((p) => p.product ?? p.name ?? p._id ?? '');
   const prodCounts   = products.slice(0, 12).map((p) => Number(p.frequency ?? p.count ?? 0));
+
+  // Case-mode: product types (call_subcategory breakdown)
+  const PRODUCT_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'];
+  const ptLabels = productTypes.map((p) => p.product_type ?? '');
+  const ptCounts = productTypes.map((p) => Number(p.count ?? 0));
+
+  // Case-mode: top issues pie (use complaints data)
+  const ISSUE_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#EC4899', '#14B8A6', '#F97316'];
+  const issueLabels = complaints.slice(0, 8).map((c) => c.complaint ?? c.text ?? '');
+  const issueCounts = complaints.slice(0, 8).map((c) => Number(c.frequency ?? c.count ?? 0));
 
   // signal grid counts from summary — API uses snake_case
   const sigCounts = {
@@ -450,9 +462,15 @@ export default function InsightsPage() {
         />
         <KpiCard
           label="Avg Customer Sentiment"
-          value={summary?.avg_customer_sentiment != null ? `${(Number(summary.avg_customer_sentiment) * 100).toFixed(0)}%` : '—'}
+          value={summary?.avg_customer_sentiment != null
+            ? isCaseMode
+              ? `${Number(summary.avg_customer_sentiment).toFixed(0)}%`
+              : `${(Number(summary.avg_customer_sentiment) * 100).toFixed(0)}%`
+            : '—'}
           sub="Customer sentiment score"
-          accent={sentimentAccent(Number(summary?.avg_customer_sentiment ?? 0) * 100)}
+          accent={sentimentAccent(isCaseMode
+            ? Number(summary?.avg_customer_sentiment ?? 0)
+            : Number(summary?.avg_customer_sentiment ?? 0) * 100)}
         />
         <KpiCard
           label="Resolution Rate"
@@ -736,7 +754,9 @@ export default function InsightsPage() {
                 agentName={a.agent_name ?? a.agent ?? a.name ?? a._id ?? `Agent ${i + 1}`}
                 score={(
                   a.avg_customer_sentiment != null
-                    ? Number(a.avg_customer_sentiment) * 100 + 50  // normalize -1..1 -> 0..100
+                    ? isCaseMode
+                      ? Number(a.avg_customer_sentiment)            // already 0..100
+                      : Number(a.avg_customer_sentiment) * 100 + 50 // normalize -1..1 -> 0..100
                     : 50
                 )}
               />
@@ -745,7 +765,37 @@ export default function InsightsPage() {
         )}
       </CardPanel>
 
-      {/* ── 9. Location + Product Charts ── */}
+      {/* ── 9. Case-mode: Product Classification + Top Issues ── */}
+      {isCaseMode && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <CardPanel title="Product Classification">
+            {ptLabels.length > 0 ? (
+              <DoughnutChart
+                labels={ptLabels}
+                data={ptCounts}
+                colors={PRODUCT_COLORS.slice(0, ptLabels.length)}
+                height={220}
+              />
+            ) : (
+              <EmptyState message="No product classification data yet. Process insights to populate." />
+            )}
+          </CardPanel>
+          <CardPanel title="Top Issues">
+            {issueLabels.length > 0 ? (
+              <DoughnutChart
+                labels={issueLabels}
+                data={issueCounts}
+                colors={ISSUE_COLORS.slice(0, issueLabels.length)}
+                height={220}
+              />
+            ) : (
+              <EmptyState message="No issues data yet." />
+            )}
+          </CardPanel>
+        </div>
+      )}
+
+      {/* ── 10. Location + Product Charts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <CardPanel title="Location Mentions">
           {locLabels.length > 0 ? (
