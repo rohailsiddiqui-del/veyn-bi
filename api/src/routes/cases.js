@@ -37,47 +37,105 @@ router.post('/upload', upload.fields([{ name: 'eval' }, { name: 'trans' }]), asy
       }
     }
 
-    // --- Parse eval XLSX ---
+    // --- Parse eval XLSX (two-row header: row0=categories, row1=subparams, row2+=data) ---
     const wb = XLSX.read(evalFile.buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const cellVal = (r, c) => { const cell = ws[XLSX.utils.encode_cell({ r, c })]; return cell ? String(cell.v || '').trim() : ''; };
 
-    if (!rows.length) return res.status(400).json({ error: 'Evaluation file has no data rows.' });
-
-    // Detect columns (case-insensitive)
-    const sampleKeys = Object.keys(rows[0]).map(k => k.trim());
-    const findKey = (...names) => sampleKeys.find(k => names.some(n => k.toLowerCase().includes(n.toLowerCase())));
-    const caseCol    = findKey('case number', 'case_number', 'case no');
-    const agentCol   = findKey('agent name', 'agent_name', 'agent');
-    const chanCol    = findKey('channel');
-    const catCol     = findKey('category');
-    const subParCol  = findKey('subparameter', 'sub parameter', 'sub-parameter', 'parameter');
-    const scoreCol   = findKey('score', 'result', 'grade');
-
-    if (!caseCol || !subParCol || !scoreCol) {
-      return res.status(400).json({
-        error: `Could not detect required columns. Found: ${sampleKeys.join(', ')}. Need: Case Number, Subparameter, Score.`
-      });
+    // Read header rows
+    const row0 = [], row1 = [];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      row0.push(cellVal(range.s.r, c));
+      row1.push(cellVal(range.s.r + 1, c));
     }
 
-    // Normalize score
+    // Determine if this is a two-row header sheet (row1 has subparam text in score columns)
+    // vs a flat sheet (row0 has all column names)
+    const isTwoRowHeader = row1.some(v => (v.length > 10 && v.toLowerCase().includes('agent')) || v.toLowerCase().startsWith('did ') || v.toLowerCase().startsWith('was '));
+
+    let caseColIdx = -1, agentColIdx = -1, chanColIdx = -1;
+    const scoreColMap = []; // [{ colIdx, category, subparam }]
+
+    if (isTwoRowHeader) {
+      // Find fixed columns by row0 header
+      caseColIdx  = row0.findIndex(v => v.toLowerCase().includes('case'));
+      agentColIdx = row0.findIndex(v => v.toLowerCase().includes('agent'));
+      chanColIdx  = row0.findIndex(v => v.toLowerCase().includes('channel'));
+
+      // Build category carry-forward
+      let currentCat = '';
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const ci = c - range.s.c;
+        if (row0[ci]) currentCat = row0[ci];
+        const subparam = row1[ci];
+        // Only score columns: not the fixed meta columns and subparam has real text
+        if (ci !== caseColIdx && ci !== agentColIdx && ci !== chanColIdx && subparam) {
+          scoreColMap.push({ colIdx: ci, category: currentCat, subparam });
+        }
+      }
+    }
+
+    // Normalize score value
     const normalizeScore = (v) => {
-      const s = String(v).trim().toLowerCase();
+      const s = String(v || '').trim().toLowerCase();
       if (['pass', '1', 'yes', 'true', 'ok'].includes(s)) return 'pass';
       if (['fail', '0', 'no', 'false', 'ng', 'nok'].includes(s)) return 'fail';
       return 'na';
     };
 
+    // Parse data rows (start from row 2 for two-row header, row 1 for flat)
+    const dataStartRow = isTwoRowHeader ? range.s.r + 2 : range.s.r + 1;
+
     // Group rows by case number
     const caseMap = {};
-    for (const row of rows) {
-      const caseNum = String(row[caseCol] || '').trim();
-      if (!caseNum) continue;
-      if (!caseMap[caseNum]) caseMap[caseNum] = [];
-      caseMap[caseNum].push(row);
+
+    if (isTwoRowHeader) {
+      for (let r = dataStartRow; r <= range.e.r; r++) {
+        const caseNum = cellVal(r, range.s.c + caseColIdx);
+        if (!caseNum) continue;
+        const agent   = agentColIdx >= 0 ? cellVal(r, range.s.c + agentColIdx) : '';
+        const channel = chanColIdx  >= 0 ? cellVal(r, range.s.c + chanColIdx).toLowerCase() : 'voice';
+        const scores  = scoreColMap.map(({ colIdx, category, subparam }) => ({
+          category,
+          subparam,
+          score: normalizeScore(cellVal(r, range.s.c + colIdx)),
+        }));
+        if (!caseMap[caseNum]) caseMap[caseNum] = [];
+        caseMap[caseNum].push({ agent, channel, scores });
+      }
+    } else {
+      // Flat format fallback: use sheet_to_json
+      const flatRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!flatRows.length) return res.status(400).json({ error: 'Evaluation file has no data rows.' });
+      const sampleKeys = Object.keys(flatRows[0]).map(k => k.trim());
+      const findKey = (...names) => sampleKeys.find(k => names.some(n => k.toLowerCase().includes(n.toLowerCase())));
+      const caseKey   = findKey('case number', 'case_number', 'case no');
+      const agentKey  = findKey('agent name', 'agent_name', 'agent');
+      const chanKey   = findKey('channel');
+      const catKey    = findKey('category');
+      const subKey    = findKey('subparameter', 'sub parameter', 'parameter');
+      const scoreKey  = findKey('score', 'result', 'grade');
+      if (!caseKey || !subKey || !scoreKey) {
+        return res.status(400).json({ error: `Cannot detect columns. Found: ${sampleKeys.join(', ')}` });
+      }
+      for (const row of flatRows) {
+        const caseNum = String(row[caseKey] || '').trim();
+        if (!caseNum) continue;
+        const agent   = String(row[agentKey] || '').trim();
+        const channel = String(row[chanKey]  || '').trim().toLowerCase() || 'voice';
+        const category= String(row[catKey]   || '').trim() || 'General';
+        const subparam= String(row[subKey]   || '').trim();
+        const score   = normalizeScore(row[scoreKey]);
+        if (!subparam) continue;
+        if (!caseMap[caseNum]) caseMap[caseNum] = [];
+        caseMap[caseNum].push({ agent, channel, scores: [{ category, subparam, score }] });
+      }
     }
 
     const caseNumbers = Object.keys(caseMap);
+    if (!caseNumbers.length) return res.status(400).json({ error: 'No valid cases found in the file.' });
+
     let casesInserted = 0, interactionsInserted = 0, scoresInserted = 0;
 
     const client = await pool.connect();
@@ -90,14 +148,10 @@ router.post('/upload', upload.fields([{ name: 'eval' }, { name: 'trans' }]), asy
         // Group by agent+channel to form interactions
         const interactionMap = {};
         for (const row of caseRows) {
-          const agent = agentCol ? String(row[agentCol] || '').trim() : '';
-          const channel = chanCol ? String(row[chanCol] || '').trim().toLowerCase() : 'voice';
-          const intKey = `${agent}|${channel}`;
-          if (!interactionMap[intKey]) interactionMap[intKey] = { agent, channel, scores: [] };
-          const category = catCol ? String(row[catCol] || '').trim() : 'General';
-          const subparam = String(row[subParCol] || '').trim();
-          const score = normalizeScore(row[scoreCol]);
-          if (subparam) interactionMap[intKey].scores.push({ category, subparam, score });
+          const intKey = `${row.agent}|${row.channel}`;
+          if (!interactionMap[intKey]) interactionMap[intKey] = { agent: row.agent, channel: row.channel, scores: [] };
+          // For two-row header each row already has all scores; for flat each row has one score
+          interactionMap[intKey].scores.push(...row.scores);
         }
 
         const interactions = Object.values(interactionMap);
