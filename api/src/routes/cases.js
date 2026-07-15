@@ -560,7 +560,7 @@ router.get('/insights/all', async (req, res) => {
   const params1 = channel ? [tenantId, channel] : [tenantId];
 
   try {
-    const [summary, categories, signals, complaints, moments, sentimentByAgent, productTypes] = await Promise.all([
+    const [summary, categories, signals, complaints, moments, sentimentByAgent, productTypes, channelSentiment, fcrData] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(DISTINCT ci.id) AS total_analysed,
@@ -585,12 +585,12 @@ router.get('/insights/all', async (req, res) => {
       `, params1),
 
       pool.query(`
-        SELECT cins.call_category, cins.call_subcategory, COUNT(*) AS count,
+        SELECT cins.call_category AS category, COUNT(*) AS count,
           ROUND(AVG(cins.customer_sentiment_score)::numeric,2) AS avg_sentiment
         FROM case_insights cins
         JOIN case_interactions ci ON ci.id = cins.interaction_id
-        WHERE cins.tenant_id=$1 AND cins.call_category IS NOT NULL ${chanClause}
-        GROUP BY cins.call_category, cins.call_subcategory ORDER BY count DESC
+        WHERE cins.tenant_id=$1 AND cins.call_category IS NOT NULL AND cins.call_category <> '' ${chanClause}
+        GROUP BY cins.call_category ORDER BY count DESC
       `, params1),
 
       pool.query(`
@@ -675,6 +675,38 @@ router.get('/insights/all', async (req, res) => {
         WHERE cins.tenant_id=$1 AND cins.call_subcategory IS NOT NULL AND cins.call_subcategory <> '' ${chanClause}
         GROUP BY product_type ORDER BY count DESC
       `, params1),
+
+      // Channel sentiment comparison (voice vs whatsapp)
+      pool.query(`
+        SELECT
+          ci.channel,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,1) AS avg_sentiment,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Neutral') AS neutral,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Mixed') AS mixed,
+          COUNT(*) AS total
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1
+        GROUP BY ci.channel ORDER BY ci.channel
+      `, [tenantId]),
+
+      // FCR: cases resolved in exactly 1 interaction vs multi-touch
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE interaction_count = 1) AS single_touch,
+          COUNT(*) FILTER (WHERE interaction_count > 1) AS multi_touch,
+          COUNT(*) AS total_cases,
+          ROUND(AVG(interaction_count)::numeric,1) AS avg_interactions,
+          MAX(interaction_count) AS max_interactions
+        FROM (
+          SELECT case_id, COUNT(*) AS interaction_count
+          FROM case_interactions
+          WHERE tenant_id=$1
+          GROUP BY case_id
+        ) t
+      `, [tenantId]),
     ]);
 
     res.json({
@@ -685,6 +717,8 @@ router.get('/insights/all', async (req, res) => {
       moments: moments.rows,
       sentimentByAgent: sentimentByAgent.rows,
       productTypes: productTypes.rows,
+      channelSentiment: channelSentiment.rows,
+      fcrData: fcrData.rows[0] || {},
       locations: [],
       products: [],
     });
