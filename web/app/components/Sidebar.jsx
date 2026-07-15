@@ -104,6 +104,20 @@ export default function Sidebar({ activePage, onNavigate }) {
           </button>
         ))}
 
+        {/* Case-mode tenants only */}
+        {user?.dashboard_mode === 'case' && (
+          <>
+            <div className="my-2 border-t border-border" />
+            <button
+              onClick={() => onNavigate('cases')}
+              className={cn('nav-item w-full text-left mb-0.5', activePage === 'cases' && 'active')}
+            >
+              <GitBranch size={16} className="flex-shrink-0" />
+              <span>Case Trajectory</span>
+            </button>
+          </>
+        )}
+
         {/* Superadmin only */}
         {user?.role === 'superadmin' && (
           <>
