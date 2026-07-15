@@ -5,7 +5,7 @@ import { Spinner } from '@/app/components/ui';
 import {
   FolderOpen, Users, TrendingUp, CheckCircle,
   Phone, MessageSquare, ChevronRight, ArrowLeft, Search,
-  BarChart2, X
+  BarChart2, X, Upload, FileSpreadsheet, FileText, ChevronDown
 } from 'lucide-react';
 
 const SCORE_BG = {
@@ -188,7 +188,7 @@ function CaseDetail({ caseNumber, onBack }) {
 
 // ── Cases Overview ────────────────────────────────────────────────────────────
 export default function CasesPage() {
-  const { apiFetch } = useAuth();
+  const { apiFetch, token, apiBase } = useAuth();
   const [overview, setOverview] = useState(null);
   const [cases, setCases] = useState([]);
   const [total, setTotal] = useState(0);
@@ -201,6 +201,47 @@ export default function CasesPage() {
   const [agentData, setAgentData] = useState(null);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const limit = 15;
+
+  // Upload panel state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [evalFile, setEvalFile] = useState(null);
+  const [transFile, setTransFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+
+  async function doUpload() {
+    if (!evalFile) { setUploadResult({ type: 'error', msg: 'Select an Evaluation file (XLSX).' }); return; }
+    const fd = new FormData();
+    fd.append('eval', evalFile);
+    if (transFile) fd.append('trans', transFile);
+    setUploading(true);
+    setUploadResult({ type: 'loading', msg: 'Uploading and processing...' });
+    try {
+      const res = await fetch(apiBase + '/api/cases/upload', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadResult({ type: 'error', msg: data.error || 'Upload failed.' });
+      } else {
+        setUploadResult({
+          type: 'success',
+          msg: `Done — ${data.cases} cases, ${data.interactions} interactions, ${data.scores} scores ingested.`,
+        });
+        setEvalFile(null); setTransFile(null);
+        // Refresh overview + cases
+        loadOverview();
+        setPage(1); setSearch(''); setSearchInput('');
+        setAgentData(null);
+      }
+    } catch (e) {
+      setUploadResult({ type: 'error', msg: e.message });
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const loadOverview = useCallback(async () => {
     const data = await apiFetch('/api/cases');
@@ -239,6 +280,58 @@ export default function CasesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Upload panel */}
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <button
+          onClick={() => { setUploadOpen(o => !o); setUploadResult(null); }}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-text-label hover:bg-surface2 transition-colors"
+        >
+          <span className="flex items-center gap-2"><Upload size={14} className="text-primary-soft" /> Upload New Data</span>
+          <ChevronDown size={14} className={`text-text-muted transition-transform ${uploadOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {uploadOpen && (
+          <div className="border-t border-border p-4 space-y-4">
+            <p className="text-xs text-text-muted">
+              Upload a new <span className="font-semibold text-text-label">Evaluation XLSX</span> (required) and optionally a <span className="font-semibold text-text-label">Transcripts CSV</span>.
+              Re-uploading the same cases will replace existing data.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <CaseFileDrop
+                icon={<FileSpreadsheet size={24} className="text-primary-soft" />}
+                label="Evaluation XLSX"
+                sub="Required — case scores"
+                accept=".xlsx,.xls,.csv"
+                file={evalFile}
+                onChange={setEvalFile}
+              />
+              <CaseFileDrop
+                icon={<FileText size={24} className="text-text-muted" />}
+                label="Transcripts CSV"
+                sub="Optional — adds transcripts"
+                accept=".csv"
+                file={transFile}
+                onChange={setTransFile}
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={doUpload}
+                disabled={uploading}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors"
+              >
+                <Upload size={13} className={uploading ? 'animate-pulse' : ''} />
+                {uploading ? 'Processing...' : 'Upload & Process'}
+              </button>
+              {uploadResult && (
+                <span className={`text-sm ${uploadResult.type === 'success' ? 'text-emerald-400' : uploadResult.type === 'error' ? 'text-red-400' : 'text-text-muted'}`}>
+                  {uploadResult.msg}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Total Cases" value={stats.total_cases} icon={FolderOpen} />
@@ -451,5 +544,17 @@ export default function CasesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function CaseFileDrop({ icon, label, sub, accept, file, onChange }) {
+  return (
+    <label className={`flex flex-col items-center justify-center p-4 border rounded-xl cursor-pointer transition-all text-center ${file ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-border2 hover:border-primary/50 hover:bg-primary/5'}`}>
+      <input type="file" accept={accept} className="hidden" onChange={e => onChange(e.target.files[0] || null)} />
+      {icon}
+      <div className="text-sm font-semibold mt-2 text-text-main">{label}</div>
+      <div className="text-xs text-text-muted mt-0.5">{sub}</div>
+      {file && <div className="text-xs text-emerald-400 font-medium mt-1.5 truncate max-w-full">{file.name}</div>}
+    </label>
   );
 }

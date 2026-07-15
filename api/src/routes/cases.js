@@ -1,6 +1,165 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
+const multer = require('multer');
+const XLSX = require('xlsx');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+// POST /api/cases/upload — ingest XLSX eval + CSV transcripts for case-mode tenants
+router.post('/upload', upload.fields([{ name: 'eval' }, { name: 'trans' }]), async (req, res) => {
+  const tenantId = req.user.tenantId;
+  const evalFile = req.files?.['eval']?.[0];
+  const transFile = req.files?.['trans']?.[0];
+
+  if (!evalFile) return res.status(400).json({ error: 'Evaluation file (XLSX or CSV) is required.' });
+
+  try {
+    // --- Parse transcripts CSV (optional) ---
+    // Expected columns: Case Number, Agent Name, Channel, Transcript, Translation
+    const transcriptMap = {};
+    if (transFile) {
+      const lines = transFile.buffer.toString('utf-8').split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+      const caseIdx = idx('Case Number'), agentIdx = idx('Agent Name'), chanIdx = idx('Channel'),
+            transIdx = idx('Transcript'), translIdx = idx('Translation');
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].match(/(".*?"|[^,]+)(?=,|$)/g);
+        if (!row) continue;
+        const clean = (v) => (v || '').replace(/^"|"$/g, '').trim();
+        const caseNum = clean(row[caseIdx]);
+        const agentName = clean(row[agentIdx]);
+        const channel = clean(row[chanIdx]);
+        if (!caseNum) continue;
+        const key = `${caseNum}|${agentName}|${channel}`;
+        transcriptMap[key] = { transcript: clean(row[transIdx]), translation: clean(row[translIdx]) };
+      }
+    }
+
+    // --- Parse eval XLSX ---
+    const wb = XLSX.read(evalFile.buffer, { type: 'buffer' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (!rows.length) return res.status(400).json({ error: 'Evaluation file has no data rows.' });
+
+    // Detect columns (case-insensitive)
+    const sampleKeys = Object.keys(rows[0]).map(k => k.trim());
+    const findKey = (...names) => sampleKeys.find(k => names.some(n => k.toLowerCase().includes(n.toLowerCase())));
+    const caseCol    = findKey('case number', 'case_number', 'case no');
+    const agentCol   = findKey('agent name', 'agent_name', 'agent');
+    const chanCol    = findKey('channel');
+    const catCol     = findKey('category');
+    const subParCol  = findKey('subparameter', 'sub parameter', 'sub-parameter', 'parameter');
+    const scoreCol   = findKey('score', 'result', 'grade');
+
+    if (!caseCol || !subParCol || !scoreCol) {
+      return res.status(400).json({
+        error: `Could not detect required columns. Found: ${sampleKeys.join(', ')}. Need: Case Number, Subparameter, Score.`
+      });
+    }
+
+    // Normalize score
+    const normalizeScore = (v) => {
+      const s = String(v).trim().toLowerCase();
+      if (['pass', '1', 'yes', 'true', 'ok'].includes(s)) return 'pass';
+      if (['fail', '0', 'no', 'false', 'ng', 'nok'].includes(s)) return 'fail';
+      return 'na';
+    };
+
+    // Group rows by case number
+    const caseMap = {};
+    for (const row of rows) {
+      const caseNum = String(row[caseCol] || '').trim();
+      if (!caseNum) continue;
+      if (!caseMap[caseNum]) caseMap[caseNum] = [];
+      caseMap[caseNum].push(row);
+    }
+
+    const caseNumbers = Object.keys(caseMap);
+    let casesInserted = 0, interactionsInserted = 0, scoresInserted = 0;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const caseNum of caseNumbers) {
+        const caseRows = caseMap[caseNum];
+
+        // Group by agent+channel to form interactions
+        const interactionMap = {};
+        for (const row of caseRows) {
+          const agent = agentCol ? String(row[agentCol] || '').trim() : '';
+          const channel = chanCol ? String(row[chanCol] || '').trim().toLowerCase() : 'voice';
+          const intKey = `${agent}|${channel}`;
+          if (!interactionMap[intKey]) interactionMap[intKey] = { agent, channel, scores: [] };
+          const category = catCol ? String(row[catCol] || '').trim() : 'General';
+          const subparam = String(row[subParCol] || '').trim();
+          const score = normalizeScore(row[scoreCol]);
+          if (subparam) interactionMap[intKey].scores.push({ category, subparam, score });
+        }
+
+        const interactions = Object.values(interactionMap);
+        const totalInteractions = interactions.length;
+
+        // Upsert case
+        const caseRes = await client.query(`
+          INSERT INTO cases (tenant_id, case_number, total_interactions)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (tenant_id, case_number) DO UPDATE
+            SET total_interactions = EXCLUDED.total_interactions
+          RETURNING id, (xmax = 0) AS inserted
+        `, [tenantId, caseNum, totalInteractions]);
+        const caseId = caseRes.rows[0].id;
+        if (caseRes.rows[0].inserted) casesInserted++;
+
+        // Delete existing interactions for this case (re-ingest = replace)
+        await client.query(`DELETE FROM case_interactions WHERE case_id = $1`, [caseId]);
+
+        let order = 1;
+        for (const interaction of interactions) {
+          const tKey = `${caseNum}|${interaction.agent}|${interaction.channel}`;
+          const tData = transcriptMap[tKey] || {};
+
+          const intRes = await client.query(`
+            INSERT INTO case_interactions (tenant_id, case_id, case_number, interaction_order, agent_name, channel, transcript, translation)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+          `, [tenantId, caseId, caseNum, order++, interaction.agent, interaction.channel, tData.transcript || null, tData.translation || null]);
+          const intId = intRes.rows[0].id;
+          interactionsInserted++;
+
+          for (const s of interaction.scores) {
+            await client.query(`
+              INSERT INTO case_interaction_scores (tenant_id, interaction_id, category, subparameter, score)
+              VALUES ($1, $2, $3, $4, $5)
+            `, [tenantId, intId, s.category, s.subparam, s.score]);
+            scoresInserted++;
+          }
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    res.json({
+      message: `Ingested successfully.`,
+      cases: caseNumbers.length,
+      casesInserted,
+      interactions: interactionsInserted,
+      scores: scoresInserted,
+    });
+
+  } catch (e) {
+    console.error('Cases upload error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // GET /api/cases — overview stats for case-mode tenants
 router.get('/', async (req, res) => {
