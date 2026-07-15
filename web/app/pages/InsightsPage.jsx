@@ -193,7 +193,8 @@ function ExpandedCall({ callId }) {
 // ─── main component ──────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
+  const { apiFetch, globalDateFrom, globalDateTo, user } = useAuth();
+  const isCaseMode = user?.dashboard_mode === 'case';
 
   // ── data state ──
   const [summary, setSummary]               = useState(null);
@@ -239,7 +240,8 @@ export default function InsightsPage() {
       if (globalDateFrom) { params.append('from', globalDateFrom); }
       if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
       const qs = params.toString();
-      const data = await apiFetch(`/api/insights/signals${qs ? '?' + qs : ''}`);
+      const endpoint = isCaseMode ? `/api/cases/insights/all` : `/api/insights/signals${qs ? '?' + qs : ''}`;
+      const data = await apiFetch(endpoint);
       setSignals(Array.isArray(data) ? data : data.signals ?? []);
     } catch (_) {}
   }, [apiFetch, globalDateFrom, globalDateTo]);
@@ -255,7 +257,7 @@ export default function InsightsPage() {
     if (globalDateTo)   { qp.append('to', globalDateTo + ' 23:59:59'); }
     const qs = qp.toString() ? `?${qp.toString()}` : '';
 
-    apiFetch(`/api/insights/all${qs}`)
+    apiFetch(isCaseMode ? `/api/cases/insights/all` : `/api/insights/all${qs}`)
       .then((d) => {
         if (cancelled) return;
         if (d.summary)         setSummary(d.summary);
@@ -287,7 +289,7 @@ export default function InsightsPage() {
     setProcessing(true);
     setProcessStatus('Processing…');
     try {
-      const data = await apiFetch('/api/insights/process', { method: 'POST' });
+      const data = await apiFetch(isCaseMode ? '/api/cases/insights/process' : '/api/insights/process', { method: 'POST' });
       setProcessStatus(data?.message ?? 'Processing started.');
     } catch (err) {
       setProcessStatus('Error: ' + (err.message || 'Failed'));
@@ -384,7 +386,7 @@ export default function InsightsPage() {
             ) : (
               <span>⚙</span>
             )}
-            Process Transcripts
+            {isCaseMode ? 'Process Case Insights' : 'Process Transcripts'}
           </Button>
           {processStatus && (
             <span className="text-xs text-text-muted">{processStatus}</span>

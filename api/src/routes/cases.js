@@ -420,4 +420,202 @@ router.get('/agents/performance', async (req, res) => {
   }
 });
 
+// POST /api/cases/insights/process — run AI on case interaction translations
+router.post('/insights/process', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  try {
+    const pending = await pool.query(`
+      SELECT ci.id, ci.case_number, ci.agent_name, ci.channel, ci.translation, ci.transcript
+      FROM case_interactions ci
+      LEFT JOIN case_insights cins ON cins.interaction_id = ci.id AND cins.error IS NULL
+      WHERE ci.tenant_id = $1 AND cins.id IS NULL
+        AND (ci.translation IS NOT NULL AND length(ci.translation) > 50
+             OR ci.transcript IS NOT NULL AND length(ci.transcript) > 50)
+    `, [tenantId]);
+
+    if (!pending.rows.length) {
+      return res.json({ message: 'No unprocessed interactions found.', pending: 0 });
+    }
+
+    res.json({ message: `Processing ${pending.rows.length} interactions in background.`, pending: pending.rows.length });
+
+    const { extractInsights } = require('../services/insights');
+
+    for (const row of pending.rows) {
+      try {
+        const text = row.translation || row.transcript;
+        const result = await extractInsights(text, 'travel');
+        if (!result) continue;
+
+        const sig = result.signal_intelligence || {};
+        await pool.query(`
+          INSERT INTO case_insights (
+            tenant_id, case_id, interaction_id,
+            call_category, call_subcategory, call_outcome,
+            customer_sentiment_overall, customer_sentiment_score,
+            agent_sentiment_overall, agent_sentiment_score,
+            threat_detected, threat_details,
+            social_media_mention, social_media_details,
+            escalation_request, escalation_details,
+            regulatory_mention, regulatory_details,
+            top_complaints, key_moments, product_mentions,
+            location_mentioned, customer_talk_pct, summary
+          )
+          SELECT $1, c.id, $2,
+            $3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+          FROM cases c
+          JOIN case_interactions ci ON ci.id = $2
+          WHERE c.id = ci.case_id
+          ON CONFLICT DO NOTHING
+        `, [
+          tenantId, row.id,
+          result.call_category || null,
+          result.call_subcategory || null,
+          result.call_outcome || null,
+          result.customer_sentiment?.overall || null,
+          result.customer_sentiment?.score != null ? Math.round((result.customer_sentiment.score + 1) * 50) : null,
+          result.agent_sentiment?.overall || null,
+          result.agent_sentiment?.score != null ? Math.round((result.agent_sentiment.score + 1) * 50) : null,
+          sig.threat_detected || false,
+          sig.threat_details || null,
+          sig.social_media_mention || false,
+          sig.social_media_details || null,
+          sig.escalation_request || false,
+          sig.escalation_details || null,
+          sig.regulatory_mention || false,
+          sig.regulatory_details || null,
+          JSON.stringify(result.top_complaints || []),
+          JSON.stringify(result.key_moments || []),
+          JSON.stringify(result.product_mentions || []),
+          result.location_mentioned || null,
+          result.talk_time?.customer_pct || null,
+          result.summary || null,
+        ]);
+      } catch (e) {
+        console.error(`Case insight error interaction ${row.id}:`, e.message);
+        await pool.query(`
+          INSERT INTO case_insights (tenant_id, case_id, interaction_id, error)
+          SELECT $1, c.id, $2, $3
+          FROM cases c JOIN case_interactions ci ON ci.id = $2 WHERE c.id = ci.case_id
+          ON CONFLICT DO NOTHING
+        `, [tenantId, row.id, e.message]);
+      }
+    }
+    console.log(`Case insights done tenant=${tenantId}: ${pending.rows.length} processed`);
+
+  } catch (e) {
+    console.error('Cases insights process error:', e);
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/cases/insights/all — same shape as /api/insights/all but from case tables
+router.get('/insights/all', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  try {
+    const [summary, categories, signals, complaints, moments, sentimentByAgent] = await Promise.all([
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM case_interactions WHERE tenant_id=$1) AS total_analysed,
+          COUNT(*) FILTER (WHERE cins.error IS NULL) AS success_count,
+          COUNT(*) FILTER (WHERE cins.threat_detected=true) AS threat_calls,
+          COUNT(*) FILTER (WHERE cins.social_media_mention=true) AS social_media_calls,
+          COUNT(*) FILTER (WHERE cins.escalation_request=true) AS escalation_calls,
+          COUNT(*) FILTER (WHERE cins.regulatory_mention=true) AS regulatory_calls,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive_calls,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative_calls,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Neutral') AS neutral_calls,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Mixed') AS mixed_calls,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,2) AS avg_customer_sentiment,
+          ROUND(AVG(cins.agent_sentiment_score)::numeric,2) AS avg_agent_sentiment,
+          ROUND(AVG(cins.customer_talk_pct)::numeric,1) AS avg_customer_talk_pct,
+          COUNT(*) FILTER (WHERE cins.call_outcome='Resolved') AS resolved_calls,
+          COUNT(*) FILTER (WHERE cins.call_outcome='Unresolved') AS unresolved_calls,
+          COUNT(*) FILTER (WHERE cins.call_outcome='Escalated') AS escalated_calls
+        FROM case_insights cins
+        WHERE cins.tenant_id=$1
+      `, [tenantId]),
+
+      pool.query(`
+        SELECT call_category, call_subcategory, COUNT(*) AS count,
+          ROUND(AVG(customer_sentiment_score)::numeric,2) AS avg_sentiment
+        FROM case_insights WHERE tenant_id=$1 AND call_category IS NOT NULL
+        GROUP BY call_category, call_subcategory ORDER BY count DESC
+      `, [tenantId]),
+
+      pool.query(`
+        SELECT
+          ci.id AS call_id, ci.case_number AS call_ref, ci.agent_name, ci.created_at AS call_date,
+          cins.call_category, cins.call_outcome,
+          cins.threat_detected, cins.threat_details,
+          cins.social_media_mention, cins.social_media_details,
+          cins.escalation_request, cins.escalation_details,
+          cins.regulatory_mention, cins.regulatory_details,
+          cins.customer_sentiment_overall, cins.summary, cins.key_moments
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1
+          AND (cins.threat_detected=true OR cins.social_media_mention=true
+               OR cins.escalation_request=true OR cins.regulatory_mention=true)
+        ORDER BY ci.created_at DESC LIMIT 100
+      `, [tenantId]),
+
+      pool.query(`
+        SELECT complaint, COUNT(*) AS frequency
+        FROM case_insights, jsonb_array_elements_text(top_complaints) AS complaint
+        WHERE tenant_id=$1 AND top_complaints != '[]'::jsonb
+        GROUP BY complaint ORDER BY frequency DESC LIMIT 15
+      `, [tenantId]),
+
+      pool.query(`
+        SELECT moment->>'type' AS moment_type, COUNT(*) AS frequency
+        FROM case_insights, jsonb_array_elements(key_moments) AS moment
+        WHERE tenant_id=$1 AND key_moments != '[]'::jsonb
+        GROUP BY moment->>'type' ORDER BY frequency DESC
+      `, [tenantId]),
+
+      pool.query(`
+        SELECT ci.agent_name,
+          COUNT(*) AS total_calls,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,2) AS avg_customer_sentiment,
+          ROUND(AVG(cins.agent_sentiment_score)::numeric,2) AS avg_agent_sentiment,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative_calls,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive_calls,
+          COUNT(*) FILTER (WHERE cins.escalation_request=true) AS escalations,
+          COUNT(*) FILTER (WHERE cins.threat_detected=true) AS threats
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1
+        GROUP BY ci.agent_name ORDER BY avg_customer_sentiment DESC
+      `, [tenantId]),
+    ]);
+
+    res.json({
+      summary: summary.rows[0],
+      categories: categories.rows,
+      signals: signals.rows,
+      complaints: complaints.rows,
+      moments: moments.rows,
+      sentimentByAgent: sentimentByAgent.rows,
+      locations: [],
+      products: [],
+    });
+  } catch (e) {
+    console.error('Cases insights all error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/cases/insights/status — how many processed vs pending
+router.get('/insights/status', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  try {
+    const total = await pool.query(`SELECT COUNT(*) FROM case_interactions WHERE tenant_id=$1`, [tenantId]);
+    const processed = await pool.query(`SELECT COUNT(*) FROM case_insights WHERE tenant_id=$1 AND error IS NULL`, [tenantId]);
+    res.json({ total: parseInt(total.rows[0].count), processed: parseInt(processed.rows[0].count) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
