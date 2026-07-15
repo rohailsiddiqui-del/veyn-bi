@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { KpiCard, CardPanel, Badge, Button, Select, Spinner, EmptyState } from '@/app/components/ui';
 import { Phone, MessageSquare } from 'lucide-react';
-import { DoughnutChart, BarChart } from '@/app/components/Charts';
+import { DoughnutChart, BarChart, RadialGauge, RankedBarChart } from '@/app/components/Charts';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -460,18 +460,24 @@ export default function InsightsPage() {
             : 'All evaluated calls'}
           accent="purple"
         />
-        <KpiCard
-          label="Avg Customer Sentiment"
-          value={summary?.avg_customer_sentiment != null
+
+        {/* Sentiment as radial gauge */}
+        {(() => {
+          const sentVal = summary?.avg_customer_sentiment != null
             ? isCaseMode
-              ? `${Number(summary.avg_customer_sentiment).toFixed(0)}%`
-              : `${(Number(summary.avg_customer_sentiment) * 100).toFixed(0)}%`
-            : '—'}
-          sub="Customer sentiment score"
-          accent={sentimentAccent(isCaseMode
-            ? Number(summary?.avg_customer_sentiment ?? 0)
-            : Number(summary?.avg_customer_sentiment ?? 0) * 100)}
-        />
+              ? Number(summary.avg_customer_sentiment)
+              : Number(summary.avg_customer_sentiment) * 100
+            : null;
+          return (
+            <div className="rounded-2xl border border-border bg-surface p-4 flex flex-col items-center justify-center hover:border-border2 transition-colors">
+              <div className="text-[10px] text-text-muted uppercase tracking-widest font-semibold mb-1">Avg Sentiment</div>
+              {sentVal != null
+                ? <RadialGauge value={sentVal} label="Sentiment" size={130} />
+                : <div className="text-2xl font-bold text-text-muted">—</div>}
+            </div>
+          );
+        })()}
+
         <KpiCard
           label="Resolution Rate"
           value={summary?.success_count != null && summary?.total_analysed != null
@@ -699,17 +705,13 @@ export default function InsightsPage() {
           {complaints.length === 0 ? (
             <EmptyState message="No complaint data." />
           ) : (
-            <ol className="space-y-2">
-              {complaints.map((c, i) => (
-                <li key={i} className="flex items-center gap-3 py-1.5 border-b border-border/40 last:border-0">
-                  <span className="text-xs font-bold text-text-muted w-5 text-right">{i + 1}.</span>
-                  <span className="flex-1 text-sm text-text-main truncate">{c.complaint ?? c.text ?? c._id ?? (typeof c === 'string' ? c : 'Unknown')}</span>
-                  {(c.count ?? c.frequency) != null && (
-                    <Badge variant="info">{c.count ?? c.frequency}</Badge>
-                  )}
-                </li>
-              ))}
-            </ol>
+            <RankedBarChart
+              items={complaints.slice(0, 12).map((c) => ({
+                label: c.complaint ?? c.text ?? c._id ?? 'Unknown',
+                value: c.frequency ?? c.count ?? 0,
+              }))}
+              color={['#EF4444','#F97316','#F59E0B','#3B82F6','#8B5CF6','#EC4899','#14B8A6','#6366F1','#84CC16','#06B6D4','#A78BFA','#FB923C']}
+            />
           )}
         </CardPanel>
 
@@ -717,27 +719,13 @@ export default function InsightsPage() {
           {moments.length === 0 ? (
             <EmptyState message="No key moment data." />
           ) : (
-            <ul className="space-y-2">
-              {moments.map((m, i) => {
-                const count = Number(m.frequency ?? m.count ?? 1);
-                const total = moments.reduce((a, x) => a + Number(x.frequency ?? x.count ?? 1), 0);
-                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                return (
-                  <li key={i} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text-main font-medium">{m.moment_type ?? m.type ?? m.label ?? m._id ?? (typeof m === 'string' ? m : 'Unknown')}</span>
-                      <span className="text-text-muted">{count ?? '—'}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-border overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${pct}%`, transition: 'width 0.6s' }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <RankedBarChart
+              items={moments.map((m) => ({
+                label: m.moment_type ?? m.type ?? m.label ?? m._id ?? 'Unknown',
+                value: m.frequency ?? m.count ?? 0,
+              }))}
+              color="#8B5CF6"
+            />
           )}
         </CardPanel>
       </div>

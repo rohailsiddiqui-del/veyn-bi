@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { KpiCard, CardPanel, Select, Spinner, EmptyState } from '@/app/components/ui';
-import { BarChart, DoughnutChart } from '@/app/components/Charts';
+import { BarChart, DoughnutChart, RadialGauge, Sparkline } from '@/app/components/Charts';
 import { useAuth } from '@/app/context/AuthContext';
 
 const DIST_LABELS = ['Below 60', '60–69', '70–79', '80–89', '90–99', '100'];
@@ -27,6 +27,7 @@ export default function OverviewPage() {
   const [selectedAgent, setSelectedAgent] = useState('all');
   const [summary, setSummary] = useState(null);
   const [distribution, setDistribution] = useState(null);
+  const [trendData, setTrendData] = useState([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
   const [loadingData, setLoadingData] = useState(true);
 
@@ -51,12 +52,15 @@ export default function OverviewPage() {
     if (globalDateTo)   { params.append('to', globalDateTo + ' 23:59:59'); }
     const q = params.toString() ? `?${params.toString()}` : '';
     try {
-      const [sum, dist] = await Promise.all([
+      const [sum, dist, trend] = await Promise.all([
         apiFetch(`/api/analytics/summary${q}`),
         apiFetch(`/api/analytics/distribution${q}`),
+        apiFetch(`/api/analytics/trend${q}`).catch(() => []),
       ]);
       setSummary(sum);
       setDistribution(dist);
+      const tList = Array.isArray(trend) ? trend : trend?.daily ?? [];
+      setTrendData(tList);
     } catch (err) {
       console.error(err);
     } finally {
@@ -80,6 +84,11 @@ export default function OverviewPage() {
   // Doughnut data — API returns 'error_free' and 'deficient' (not error_free_calls)
   const errorFree = Number(summary?.error_free ?? 0);
   const deficient = Number(summary?.deficient ?? 0);
+
+  // Sparkline data from trend
+  const sparkScores  = trendData.slice(-14).map((d) => Number(d.avgScore ?? d.avg_score ?? 0));
+  const sparkVolume  = trendData.slice(-14).map((d) => Number(d.total_calls ?? d.callCount ?? 0));
+  const avgScore = summary?.avg_score != null ? Number(summary.avg_score) : null;
 
   // Date range label – globalDate or last 30 days
   const today = new Date();
@@ -128,40 +137,50 @@ export default function OverviewPage() {
         <Spinner />
       ) : summary ? (
         <>
-          {/* KPI cards */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KpiCard
-              label="Total Calls"
-              value={fmt(summary.total_calls)}
-              sub="All evaluated calls"
-              accent="purple"
-            />
-            <KpiCard
-              label="Avg Score"
-              value={summary.avg_score !== undefined ? `${Number(summary.avg_score).toFixed(1)}%` : '—'}
-              sub="Mean quality score"
-              accent={scoreAccent(Number(summary.avg_score))}
-            />
-            <KpiCard
-              label="Error Free"
-              value={fmt(summary.error_free)}
-              sub={
-                summary.total_calls
-                  ? `${fmt((errorFree / Number(summary.total_calls)) * 100, 1)}% of total`
-                  : '0% of total'
-              }
-              accent="green"
-            />
-            <KpiCard
-              label="Deficient"
-              value={fmt(summary.deficient)}
-              sub={
-                summary.total_calls
-                  ? `${fmt((deficient / Number(summary.total_calls)) * 100, 1)}% of total`
-                  : '0% of total'
-              }
-              accent="red"
-            />
+          {/* KPI row — gauge + 3 cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            {/* Radial gauge for Avg Score */}
+            <div className="sm:col-span-1 rounded-2xl border border-border bg-surface p-5 flex flex-col items-center justify-center gap-1">
+              <div className="text-[10px] text-text-muted uppercase tracking-widest font-semibold mb-1">Avg Score</div>
+              <RadialGauge value={avgScore ?? 0} label="Quality" size={160} />
+            </div>
+
+            {/* Total Calls with sparkline */}
+            <div className="rounded-2xl border border-border bg-surface p-5 flex flex-col gap-3 hover:border-border2 transition-colors">
+              <div className="text-[10px] text-text-muted uppercase tracking-widest font-semibold">Total Calls</div>
+              <div className="text-3xl font-bold text-text-main">{fmt(summary.total_calls)}</div>
+              <div className="text-xs text-text-muted">All evaluated calls</div>
+              <div className="-mx-1 -mb-2 mt-auto">
+                <Sparkline data={sparkVolume} color="#8B5CF6" height={44} />
+              </div>
+            </div>
+
+            {/* Error Free with sparkline */}
+            <div className="rounded-2xl border border-border bg-surface p-5 flex flex-col gap-3 hover:border-border2 transition-colors">
+              <div className="text-[10px] text-text-muted uppercase tracking-widest font-semibold">Error Free</div>
+              <div className="text-3xl font-bold text-green-400">{fmt(summary.error_free)}</div>
+              <div className="text-xs text-text-muted">
+                {summary.total_calls ? `${fmt((errorFree / Number(summary.total_calls)) * 100, 1)}% of total` : '0% of total'}
+              </div>
+              <div className="-mx-1 -mb-2 mt-auto">
+                <Sparkline data={sparkScores} color="#22C55E" height={44} />
+              </div>
+            </div>
+
+            {/* Deficient */}
+            <div className="rounded-2xl border border-border bg-surface p-5 flex flex-col gap-3 hover:border-border2 transition-colors">
+              <div className="text-[10px] text-text-muted uppercase tracking-widest font-semibold">Deficient</div>
+              <div className="text-3xl font-bold text-red-400">{fmt(summary.deficient)}</div>
+              <div className="text-xs text-text-muted">
+                {summary.total_calls ? `${fmt((deficient / Number(summary.total_calls)) * 100, 1)}% of total` : '0% of total'}
+              </div>
+              <div className="mt-auto pt-2">
+                <div className="h-2 rounded-full bg-border overflow-hidden">
+                  <div className="h-full rounded-full bg-red-400 transition-all duration-700"
+                    style={{ width: `${summary.total_calls ? Math.round((deficient / Number(summary.total_calls)) * 100) : 0}%` }} />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Charts row */}

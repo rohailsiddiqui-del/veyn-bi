@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { CardPanel, Select, Spinner, EmptyState } from '@/app/components/ui';
-import { LineChart, BarChart } from '@/app/components/Charts';
+import { LineChart, BarChart, MultiAreaChart } from '@/app/components/Charts';
 
 export default function TrendPage() {
   const { apiFetch, globalDateFrom, globalDateTo } = useAuth();
@@ -45,10 +45,20 @@ export default function TrendPage() {
   }, [agent, loadTrend]);
 
   const trendList = Array.isArray(trend) ? trend : trend?.daily ?? [];
-  const scoreLabels = trendList.map((d) => d.date ? new Date(d.date).toLocaleDateString() : '');
-  const scoreData = trendList.map((d) => Number(d.avgScore ?? d.avg_score ?? 0));
-  const volumeLabels = trendList.map((d) => d.date ? new Date(d.date).toLocaleDateString() : '');
+  const dateLabels = trendList.map((d) => d.date ? new Date(d.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '');
+  const scoreData  = trendList.map((d) => Number(d.avgScore ?? d.avg_score ?? 0));
   const volumeData = trendList.map((d) => Number(d.total_calls ?? d.callCount ?? d.call_count ?? 0));
+  const errorRateData = trendList.map((d) => {
+    const total = Number(d.total_calls ?? d.callCount ?? 1);
+    const deficient = Number(d.deficient ?? d.deficient_calls ?? 0);
+    return total > 0 ? Math.round((deficient / total) * 100) : 0;
+  });
+
+  // Multi-series for combined chart
+  const combinedSeries = [
+    { name: 'Avg Score', data: scoreData, color: '#8B5CF6' },
+    { name: 'Error Rate %', data: errorRateData, color: '#EF4444' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -91,27 +101,15 @@ export default function TrendPage() {
         <EmptyState message="No trend data available for the selected agent." />
       ) : (
         <div className="space-y-5">
-          {/* Score line chart */}
-          <CardPanel title="Daily Average Score">
-            <div style={{ height: 280 }}>
-              <LineChart
-                labels={scoreLabels}
-                data={scoreData}
-                height={280}
-                minY={60}
-              />
-            </div>
+          {/* Combined score + error rate multi-area */}
+          <CardPanel title="Score vs Error Rate — Daily Trend">
+            <MultiAreaChart series={combinedSeries} labels={dateLabels} height={300} />
           </CardPanel>
 
           {/* Volume bar chart */}
           <CardPanel title="Daily Call Volume">
             <div style={{ height: 280 }}>
-              <BarChart
-                labels={volumeLabels}
-                data={volumeData}
-                colors="#3B82F6"
-                height={280}
-              />
+              <BarChart labels={dateLabels} data={volumeData} colors="#3B82F6" height={280} />
             </div>
           </CardPanel>
         </div>
