@@ -32,7 +32,7 @@ export function KpiCard({ label, value, sub, accent = 'purple', className }) {
   );
 }
 
-export function CardPanel({ title, children, className, action }) {
+export function CardPanel({ title, sub, children, className, action }) {
   return (
     <div
       className={cn(
@@ -41,10 +41,15 @@ export function CardPanel({ title, children, className, action }) {
       )}
     >
       {(title || action) && (
-        <div className="flex items-center justify-between mb-4">
-          {title && (
-            <div className="text-xs font-semibold text-text-label uppercase tracking-widest">{title}</div>
-          )}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            {title && (
+              <div className="text-xs font-semibold text-text-label uppercase tracking-widest">{title}</div>
+            )}
+            {sub && (
+              <div className="text-[11px] text-text-muted mt-0.5 normal-case tracking-normal font-normal">{sub}</div>
+            )}
+          </div>
           {action}
         </div>
       )}

@@ -91,7 +91,7 @@ function ChannelSentimentCard({ channelSentiment }) {
   if (!channelSentiment || channelSentiment.length === 0) return null;
   const SENT_COLORS = { Positive: '#22C55E', Neutral: '#F59E0B', Mixed: '#8B5CF6', Negative: '#EF4444' };
   return (
-    <CardPanel title="Voice vs WhatsApp — Sentiment Breakdown">
+    <CardPanel title="Voice vs WhatsApp — Sentiment Breakdown" sub="Avg sentiment = mean AI score (0–100) across all interactions on that channel. Bars show how many interactions fell into each sentiment bucket.">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {channelSentiment.map((ch) => {
           const total = Number(ch.total) || 1;
@@ -524,16 +524,11 @@ export default function InsightsPage() {
         })()}
 
         {isCaseMode ? (
-          // Case-mode: FCR % instead of resolution rate
           <KpiCard
-            label="FCR Rate"
-            value={fcrData?.total_cases
-              ? `${Math.round((Number(fcrData.single_touch) / Number(fcrData.total_cases)) * 100)}%`
-              : '—'}
-            sub="First contact resolution"
-            accent={fcrData?.total_cases
-              ? (Math.round((Number(fcrData.single_touch) / Number(fcrData.total_cases)) * 100) >= 60 ? 'green' : 'amber')
-              : 'purple'}
+            label="Escalations"
+            value={summary?.escalation_calls ?? '—'}
+            sub="Interactions where customer requested escalation"
+            accent={Number(summary?.escalation_calls) > 10 ? 'red' : 'amber'}
           />
         ) : (
           <KpiCard
@@ -547,12 +542,11 @@ export default function InsightsPage() {
         )}
 
         {isCaseMode ? (
-          // Case-mode: avg interactions per case
           <KpiCard
-            label="Avg Touches / Case"
-            value={fcrData?.avg_interactions ? fmt(Number(fcrData.avg_interactions), 1) : '—'}
-            sub={`Max ${fcrData?.max_interactions ?? '—'} interactions`}
-            accent="blue"
+            label="Negative Sentiment"
+            value={summary?.negative_calls ?? '—'}
+            sub="Interactions with negative customer sentiment"
+            accent={Number(summary?.negative_calls) > 20 ? 'red' : 'amber'}
           />
         ) : (
           <KpiCard
@@ -565,7 +559,7 @@ export default function InsightsPage() {
       </div>
 
       {/* ── 3. Signal Intelligence Grid ── */}
-      <CardPanel title="Signal Intelligence">
+      <CardPanel title="Signal Intelligence" sub="Count of interactions flagged by AI for each signal type. Click a card to filter the table below.">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {SIGNAL_ORDER.map((key) => {
             const cfg = SIGNAL_CONFIGS[key];
@@ -592,12 +586,10 @@ export default function InsightsPage() {
         )}
       </CardPanel>
 
-      {/* ── 4. FCR Card (case-mode only) ── */}
-      {isCaseMode && <FCRCard fcrData={fcrData} />}
-
       {/* ── 5. Flagged Calls Table ── */}
       <CardPanel
         title="Flagged Interactions"
+        sub="Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue). Each count = one interaction."
         action={
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-muted">Signal type</span>
@@ -689,14 +681,20 @@ export default function InsightsPage() {
 
       {/* ── 6. Chart Row: Call Classification + Sentiment Distribution ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <CardPanel title={isCaseMode ? 'Interaction Type Breakdown' : 'Call Classification'}>
+        <CardPanel
+          title={isCaseMode ? 'Interaction Type Breakdown' : 'Call Classification'}
+          sub={isCaseMode ? 'Each slice = number of interactions in that category (Inquiry, Complaint, Billing, etc.), as classified by AI from the transcript.' : 'Distribution of calls by type as classified by AI.'}
+        >
           {catLabels.length > 0 ? (
             <DoughnutChart labels={catLabels} data={catCounts} colors={CAT_COLORS.slice(0, catLabels.length)} height={220} />
           ) : (
             <EmptyState message="No classification data." />
           )}
         </CardPanel>
-        <CardPanel title="Customer Sentiment Distribution">
+        <CardPanel
+          title="Customer Sentiment Distribution"
+          sub="AI scores each interaction 0–100 based on the customer's tone and language. Positive ≥65, Neutral 50–64, Mixed 30–49, Negative <30. Each slice = interaction count."
+        >
           {sentHasData ? (
             <DoughnutChart labels={sentLabels} data={sentCounts} colors={SENT_COLORS} height={220} />
           ) : (
@@ -724,14 +722,20 @@ export default function InsightsPage() {
       {/* ── 8. Case-mode: Product Classification + Top Issues ── */}
       {isCaseMode && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <CardPanel title="Issue Category Breakdown">
+          <CardPanel
+            title="Issue Category Breakdown"
+            sub="Interactions grouped into 8 buckets based on AI-extracted subcategory keywords (e.g. 'refund', 'hotel', 'baggage'). Count = number of interactions per bucket."
+          >
             {ptLabels.length > 0 ? (
               <DoughnutChart labels={ptLabels} data={ptCounts} colors={PRODUCT_COLORS.slice(0, ptLabels.length)} height={220} />
             ) : (
               <EmptyState message="No product classification data yet." />
             )}
           </CardPanel>
-          <CardPanel title="Top Issue Categories">
+          <CardPanel
+            title="Top Issue Categories"
+            sub="Same 8 buckets as the pie chart, ranked by interaction count. Higher bar = more customer interactions about that issue type."
+          >
             {issueLabels.length > 0 ? (
               <RankedBarChart
                 items={complaints.slice(0, 8).map((c) => ({
@@ -761,7 +765,10 @@ export default function InsightsPage() {
             )}
           </CardPanel>
         )}
-        <CardPanel title="Key Moment Types">
+        <CardPanel
+          title="Key Moment Types"
+          sub="AI identifies notable moments in each transcript (e.g. Customer Complaint, Hold, Escalation). Count = total occurrences across all interactions."
+        >
           {moments.length === 0 ? (
             <EmptyState message="No key moment data." />
           ) : (
@@ -778,7 +785,7 @@ export default function InsightsPage() {
       {isCaseMode && <ChannelSentimentCard channelSentiment={channelSentiment} />}
 
       {/* ── 11. Sentiment by Agent ── */}
-      <CardPanel title="Sentiment by Agent">
+      <CardPanel title="Sentiment by Agent" sub="Each bar = average AI customer sentiment score (0–100) for that agent across all their interactions. Green ≥65, Amber 45–64, Red <45.">
         {sentimentByAgent.length === 0 ? (
           <EmptyState message="No agent sentiment data." />
         ) : (
