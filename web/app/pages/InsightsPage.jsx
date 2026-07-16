@@ -513,7 +513,9 @@ export default function InsightsPage() {
         {/* Avg Sentiment as radial gauge */}
         {(() => {
           const sentVal = summary?.avg_customer_sentiment != null
-            ? Number(summary.avg_customer_sentiment)
+            ? isCaseMode
+              ? Number(summary.avg_customer_sentiment)
+              : (Number(summary.avg_customer_sentiment) + 1) * 50
             : null;
           return (
             <div className="rounded-2xl border border-border bg-surface p-4 flex flex-col items-center justify-center hover:border-border2 transition-colors">
