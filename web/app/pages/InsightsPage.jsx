@@ -305,7 +305,7 @@ export default function InsightsPage() {
 
   const deleteCall = useCallback(async (callId, e) => {
     e.stopPropagation();
-    if (!confirm('Delete this call and all its data? This cannot be undone.')) return;
+    if (!confirm('Delete this interaction and all its data? This cannot be undone.')) return;
     setDeletingCallId(callId);
     try {
       await apiFetch(`/api/analytics/calls/${callId}`, { method: 'DELETE' });
@@ -586,10 +586,10 @@ export default function InsightsPage() {
         )}
       </CardPanel>
 
-      {/* ── 5. Flagged Calls Table ── */}
+      {/* ── 5. Flagged Interactions Table ── */}
       <CardPanel
-        title="Flagged Interactions"
-        sub="Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue). Each count = one interaction."
+        title={isCaseMode ? 'Flagged Interactions' : 'Flagged Calls'}
+        sub={isCaseMode ? 'Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue). Each count = one interaction.' : 'Calls where AI detected at least one signal. Each count = one call.'}
         action={
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-muted">Signal type</span>
@@ -604,13 +604,13 @@ export default function InsightsPage() {
         }
       >
         {displayedSignals.length === 0 ? (
-          <EmptyState message="No flagged interactions for the selected filter." />
+          <EmptyState message={`No flagged ${isCaseMode ? 'interactions' : 'calls'} for the selected filter.`} />
         ) : (
           <div className="overflow-x-auto -mx-1">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border">
-                  {[isCaseMode ? 'Case Ref' : 'Call Ref', 'Agent', isCaseMode ? 'Channel' : 'Date', 'Category', 'Flags', 'Sentiment', 'Details', ''].map((h) => (
+                  {[isCaseMode ? 'Case Ref' : 'Call Ref', 'Agent', isCaseMode ? 'Channel' : 'Date', isCaseMode ? 'Type' : 'Category', 'Flags', 'Sentiment', 'Details', ''].map((h) => (
                     <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-widest py-2 px-3">{h}</th>
                   ))}
                 </tr>
@@ -656,7 +656,7 @@ export default function InsightsPage() {
                           <button
                             onClick={(e) => deleteCall(id, e)}
                             disabled={deletingCallId === id}
-                            title="Delete this call"
+                            title={isCaseMode ? 'Delete this interaction' : 'Delete this call'}
                             style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, backgroundColor: deletingCallId === id ? '#374151' : 'rgba(239,68,68,0.1)', color: deletingCallId === id ? '#6b7280' : '#f87171', border: '1px solid rgba(239,68,68,0.3)', cursor: deletingCallId === id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
                           >
                             {deletingCallId === id ? '…' : 'Delete'}
