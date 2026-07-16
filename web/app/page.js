@@ -22,6 +22,11 @@ export default function AppShell() {
   const { token, user, globalDateFrom, setGlobalDateFrom, globalDateTo, setGlobalDateTo } = useAuth();
   const [activePage, setActivePage] = useState('overview');
   const [mounted, setMounted] = useState(false);
+
+  // When user loads (async after token restore), set the correct landing page
+  useEffect(() => {
+    if (user?.dashboard_mode === 'case') setActivePage('cases');
+  }, [user?.dashboard_mode]);
   // react-datepicker range: [startDate, endDate]
   const [dateRange, setDateRange] = useState([null, null]);
   const [startDate, endDate] = dateRange;
