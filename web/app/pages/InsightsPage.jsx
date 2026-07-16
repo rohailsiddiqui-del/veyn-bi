@@ -77,12 +77,12 @@ const SIGNAL_CONFIGS = {
 };
 
 const SIGNAL_TYPE_MAP = {
-  threats: 'threat',
-  social: 'social',
+  threats:     'threat',
+  social:      'social',
   escalations: 'escalation',
-  regulatory: 'regulatory',
-  negative: 'negative',
-  positive: 'positive',
+  regulatory:  'regulatory',
+  negative:    'negative',
+  positive:    'positive',
 };
 
 // ─── channel sentiment comparison (case-mode) ────────────────────────────────
@@ -437,6 +437,8 @@ export default function InsightsPage() {
 
   const displayedSignals = signalFilter
     ? signals.filter((s) => {
+        if (signalFilter === 'negative') return s.customer_sentiment_overall?.toLowerCase() === 'negative';
+        if (signalFilter === 'positive') return s.customer_sentiment_overall?.toLowerCase() === 'positive';
         const types = [];
         if (s.threat_detected)      types.push('threat');
         if (s.social_media_mention) types.push('social');
@@ -574,7 +576,15 @@ export default function InsightsPage() {
                 count={count}
                 colorClass={cfg.color}
                 active={signalFilter === key}
-                onClick={() => setSignalFilter(signalFilter === key ? null : key)}
+                onClick={() => {
+                  const next = signalFilter === key ? null : key;
+                  setSignalFilter(next);
+                  // Both modes: update signalType so API re-fetches with correct filter.
+                  // Sentiment-based filters (negative/positive) need separate API call
+                  // since default fetch only returns flag-based signals.
+                  const apiType = next ? SIGNAL_TYPE_MAP[next] ?? next : 'all';
+                  setSignalType(apiType);
+                }}
               />
             );
           })}
@@ -619,16 +629,26 @@ export default function InsightsPage() {
       {/* ── 5. Flagged Interactions Table ── */}
       <CardPanel
         title={isCaseMode ? 'Flagged Interactions' : 'Flagged Calls'}
-        sub={isCaseMode ? 'Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue). Each count = one interaction.' : 'Calls where AI detected at least one signal. Each count = one call.'}
+        sub={
+          signalType === 'negative' ? (isCaseMode ? 'Interactions with Negative customer sentiment.' : 'Calls with Negative customer sentiment.')
+          : signalType === 'positive' ? (isCaseMode ? 'Interactions with Positive customer sentiment.' : 'Calls with Positive customer sentiment.')
+          : isCaseMode ? 'Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue).'
+          : 'Calls where AI detected at least one signal.'
+        }
         action={
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-muted">Signal type</span>
-            <Select id="signal-type-filter" value={signalType} onChange={(e) => setSignalType(e.target.value)}>
-              <option value="all">All</option>
+            <Select id="signal-type-filter" value={signalType} onChange={(e) => {
+              setSignalType(e.target.value);
+              setSignalFilter(null);
+            }}>
+              <option value="all">All Flagged</option>
               <option value="threat">Threat</option>
               <option value="social">Social Media</option>
               <option value="escalation">Escalation</option>
               <option value="regulatory">Regulatory</option>
+              <option value="negative">Negative Sentiment</option>
+              <option value="positive">Positive Sentiment</option>
             </Select>
           </div>
         }

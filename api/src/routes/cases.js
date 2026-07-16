@@ -549,15 +549,26 @@ router.post('/insights/process', async (req, res) => {
 });
 
 // GET /api/cases/insights/all — same shape as /api/insights/all but from case tables
-// Supports ?channel=voice|whatsapp to filter by interaction channel
+// Supports ?channel=voice|whatsapp and ?type=threat|escalation|social|regulatory|negative|positive
 router.get('/insights/all', async (req, res) => {
   const tenantId = req.user.tenantId;
-  const channel = req.query.channel ? req.query.channel.toLowerCase() : null;
+  const channel  = req.query.channel ? req.query.channel.toLowerCase() : null;
+  const signalType = req.query.type || null;
 
   // All queries join case_interactions (ci), so we filter on LOWER(ci.channel)
   const chanClause = channel ? `AND LOWER(ci.channel) = $2` : '';
 
   const params1 = channel ? [tenantId, channel] : [tenantId];
+
+  // Build signal filter clause for the signals query (separate param list, no channel param)
+  let signalWhere = '';
+  if (signalType === 'threat')        signalWhere = ' AND cins.threat_detected = true';
+  else if (signalType === 'social')   signalWhere = ' AND cins.social_media_mention = true';
+  else if (signalType === 'escalation') signalWhere = ' AND cins.escalation_request = true';
+  else if (signalType === 'regulatory') signalWhere = ' AND cins.regulatory_mention = true';
+  else if (signalType === 'negative') signalWhere = " AND cins.customer_sentiment_overall = 'Negative'";
+  else if (signalType === 'positive') signalWhere = " AND cins.customer_sentiment_overall = 'Positive'";
+  else signalWhere = ' AND (cins.threat_detected=true OR cins.social_media_mention=true OR cins.escalation_request=true OR cins.regulatory_mention=true OR cins.customer_sentiment_overall IN (\'Negative\',\'Positive\'))';
 
   try {
     const [summary, categories, signals, complaints, moments, sentimentByAgent, productTypes, channelSentiment, fcrData, signalsByChannel] = await Promise.all([
@@ -606,8 +617,7 @@ router.get('/insights/all', async (req, res) => {
         FROM case_insights cins
         JOIN case_interactions ci ON ci.id = cins.interaction_id
         WHERE cins.tenant_id=$1
-          AND (cins.threat_detected=true OR cins.social_media_mention=true
-               OR cins.escalation_request=true OR cins.regulatory_mention=true)
+          ${signalWhere}
           ${chanClause}
         ORDER BY ci.created_at DESC LIMIT 100
       `, params1),

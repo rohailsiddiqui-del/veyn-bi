@@ -250,10 +250,12 @@ router.get('/signals', async (req, res) => {
     if (batchId) { params.push(batchId); where += ` AND c.batch_id = $${params.length}`; }
 
     // Filter by signal type
-    if (type === 'threat')       where += ' AND ci.threat_detected = true';
-    else if (type === 'social')  where += ' AND ci.social_media_mention = true';
+    if (type === 'threat')          where += ' AND ci.threat_detected = true';
+    else if (type === 'social')     where += ' AND ci.social_media_mention = true';
     else if (type === 'escalation') where += ' AND ci.escalation_request = true';
     else if (type === 'regulatory') where += ' AND ci.regulatory_mention = true';
+    else if (type === 'negative')   where += " AND ci.customer_sentiment_overall = 'Negative'";
+    else if (type === 'positive')   where += " AND ci.customer_sentiment_overall = 'Positive'";
     else where += ' AND (ci.threat_detected=true OR ci.social_media_mention=true OR ci.escalation_request=true OR ci.regulatory_mention=true)';
 
     const r = await db.query(`
