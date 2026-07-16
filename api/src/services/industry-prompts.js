@@ -4,8 +4,9 @@
 
 const INDUSTRY_PROMPTS = {
   retail: `
-INDUSTRY CONTEXT — Retail:
-Focus on: product quality complaints, sizing/fit issues, returns & exchanges, delivery delays, damaged goods, stock availability, discount/pricing disputes, and upsell/cross-sell moments.
+INDUSTRY CONTEXT — Retail & E-commerce:
+Focus on mandatory CX metrics: First Contact Resolution (FCR), Agent Empathy, ease of Returns/Exchanges, Product Quality & Sizing Accuracy, Shipping & Delivery Speed, and Proactive Order Updates.
+Focus on issues: product quality complaints, sizing/fit issues, returns & exchanges, delivery delays, damaged goods, stock availability, discount/pricing disputes, and upsell/cross-sell moments.
 For call_category, prefer: Returns, Delivery, Complaint, Billing, Inquiry, Feedback.
 For call_subcategory examples: 'Wrong Item Delivered', 'Size Exchange Request', 'Refund Status', 'Damaged Product', 'Discount Not Applied', 'Out of Stock Query'.
 Flag upsell opportunities in key_moments when agent successfully recommended additional products.
@@ -50,10 +51,11 @@ For regulatory_mention, flag references to SBP (State Bank of Pakistan), FIA, Ba
 `,
 
   ecommerce: `
-INDUSTRY CONTEXT — E-commerce:
-Focus on: order tracking, delayed/missing deliveries, wrong items, return/refund requests, payment failures, seller disputes, product quality, and customer account issues.
+INDUSTRY CONTEXT — E-commerce & Retail:
+Focus on mandatory CX metrics: First Contact Resolution (FCR), Agent Empathy, ease of Returns/Refunds, Product Quality & Sizing Accuracy, Shipping & Delivery Speed, and Proactive Order Updates.
+Focus on issues: order tracking, delayed/missing deliveries, wrong items, return/refund requests, payment failures, seller disputes, product quality, and customer account issues.
 For call_category, prefer: Delivery, Returns, Complaint, Billing, Inquiry, Technical Support.
-For call_subcategory examples: 'Order Not Received', 'Wrong Item Sent', 'Return Request', 'Refund Not Received', 'Payment Failure', 'Seller Complaint', 'Account Access Issue', 'Tracking Query'.
+For call_subcategory examples: 'Order Not Received', 'Wrong Item Sent', 'Return Request', 'Refund Not Received', 'Payment Failure', 'Seller Complaint', 'Account Access Issue', 'Tracking Query', 'Sizing Issue'.
 Flag high-value order disputes prominently in top_complaints.
 Identify upsell/cross-sell moments in key_moments when relevant.
 For regulatory_mention, flag consumer protection body references.
