@@ -474,7 +474,7 @@ router.post('/insights/process', async (req, res) => {
     for (const row of pending.rows) {
       try {
         const text = row.translation || row.transcript;
-        const result = await extractInsights(text, 'travel');
+        const result = await extractInsights(text, 'travel', row.channel);
         if (!result) continue;
 
         const sig = result.signal_intelligence || {};

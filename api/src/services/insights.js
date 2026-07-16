@@ -61,7 +61,7 @@ Extract and return a JSON object with EXACTLY this structure (no extra keys, no 
     "customer_pct": number — estimated % of conversation time by customer,
     "agent_pct": number — estimated % of conversation time by agent
   },
-  "summary": "string — 2-3 sentence plain English summary of the call"
+  "summary": "string — 2-3 sentence plain English summary of the interaction. Use 'customer contacted' or 'customer reached out' — NEVER say 'customer called' for WhatsApp or chat interactions"
 }
 
 CRITICAL RULES — follow these without exception:
@@ -75,7 +75,7 @@ function smartTruncate(text, max = 12000) {
   return text.slice(0, 9000) + '\n...\n' + text.slice(-3000);
 }
 
-async function extractInsights(transcriptText, industry = 'generic') {
+async function extractInsights(transcriptText, industry = 'generic', channel = null) {
   // No transcript or too short to be meaningful — return zeroed insight instead of hallucinating
   if (!transcriptText || transcriptText.trim().length < 100) {
     return {
@@ -97,7 +97,20 @@ async function extractInsights(transcriptText, industry = 'generic') {
   transcriptText = smartTruncate(transcriptText);
 
   const industryContext = getIndustryPrompt(industry);
-  const fullPrompt = EXTRACTION_PROMPT + industryContext + '\nTranscript:\n' + transcriptText;
+
+  // Channel context: tell the model what type of interaction this is so
+  // it doesn't use "called" language in summaries for WhatsApp/chat interactions
+  let channelContext = '';
+  if (channel) {
+    const ch = channel.toLowerCase();
+    if (ch === 'whatsapp') {
+      channelContext = '\nCHANNEL CONTEXT: This is a WhatsApp chat interaction, NOT a phone call. In the summary field, use "customer contacted via WhatsApp" or "customer reached out" — NEVER write "customer called".\n';
+    } else if (ch === 'voice' || ch === 'call') {
+      channelContext = '\nCHANNEL CONTEXT: This is a voice call interaction.\n';
+    }
+  }
+
+  const fullPrompt = EXTRACTION_PROMPT + channelContext + industryContext + '\nTranscript:\n' + transcriptText;
 
   const accessToken = await getAccessToken();
 
