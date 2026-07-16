@@ -67,6 +67,7 @@ Extract and return a JSON object with EXACTLY this structure (no extra keys, no 
 CRITICAL RULES — follow these without exception:
 - If the transcript is empty, too short, or contains no real conversation, return all signal_intelligence fields as false/null and summary as null. Do NOT invent or assume any conversation content.
 - Only flag threat_detected, social_media_mention, escalation_request, or regulatory_mention as true if there is explicit, verbatim evidence in the transcript. Never infer or assume.
+- ALL extracted insights (including complaints, key moments, and sentiment) MUST be strictly based on the provided transcript. DO NOT hallucinate, infer, or invent any details that are not explicitly stated by the customer or agent.
 - If you are not certain, default to false.
 `;
 
@@ -123,7 +124,7 @@ async function extractInsights(transcriptText, industry = 'generic', channel = n
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.0,
         maxOutputTokens: 8192,
         responseMimeType: 'application/json'
       }
