@@ -237,8 +237,8 @@ export function MultiAreaChart({ series = [], labels = [], height = 300 }) {
 }
 
 // ── ApexCharts: Ranked Horizontal Bar (for Top Complaints / lists) ────────────
-// items: [{ label, value }], color: hex or array
-export function RankedBarChart({ items = [], color = '#8B5CF6', height, valueFormatter }) {
+// items: [{ label, value }], color: hex or array, seriesName: tooltip label
+export function RankedBarChart({ items = [], color = '#8B5CF6', height, valueFormatter, seriesName = 'Count' }) {
   const labels = items.map((i) => i.label);
   const values = items.map((i) => Number(i.value));
   const dynamicHeight = height ?? Math.max(200, items.length * 44 + 60);
@@ -253,22 +253,25 @@ export function RankedBarChart({ items = [], color = '#8B5CF6', height, valueFor
     dataLabels: {
       enabled: true, offsetX: 8,
       style: { fontSize: '11px', colors: ['#9CA3AF'] },
-      formatter: valueFormatter ?? ((v) => v),
+      formatter: valueFormatter ?? ((v) => v.toLocaleString()),
     },
     xaxis: {
       categories: labels,
-      labels: { style: { colors: '#6B7280', fontSize: '11px' } },
+      labels: { style: { colors: '#6B7280', fontSize: '11px' }, formatter: (v) => Number(v).toLocaleString() },
       axisBorder: { show: false }, axisTicks: { show: false },
     },
     yaxis: { labels: { style: { colors: '#9CA3AF', fontSize: '11px' }, maxWidth: 220 } },
     grid: { borderColor: 'rgba(55,65,81,0.3)', strokeDashArray: 3,
       xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } },
-    tooltip: { theme: 'dark', shared: false, intersect: true },
+    tooltip: {
+      theme: 'dark', shared: false, intersect: true,
+      y: { formatter: (v) => `${Number(v).toLocaleString()} ${seriesName.toLowerCase()}` },
+    },
     theme: { mode: 'dark' },
   };
 
   return (
-    <ApexChart type="bar" series={[{ name: 'Count', data: values }]}
+    <ApexChart type="bar" series={[{ name: seriesName, data: values }]}
       options={options} height={dynamicHeight} width="100%" />
   );
 }

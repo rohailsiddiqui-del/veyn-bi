@@ -804,20 +804,21 @@ export default function InsightsPage() {
       {/* ── 9. Top Complaints + Key Moment Types ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {!isCaseMode && (
-          <CardPanel title="Top Complaints">
+          <CardPanel title="Top Complaints" sub="How many times each complaint phrase appeared across all analysed calls.">
             {complaints.length === 0 ? (
               <EmptyState message="No complaint data." />
             ) : (
               <RankedBarChart
                 items={complaints.slice(0, 12).map((c) => ({ label: c.complaint ?? c.text ?? c._id ?? 'Unknown', value: c.frequency ?? c.count ?? 0 }))}
                 color={['#EF4444','#F97316','#F59E0B','#3B82F6','#8B5CF6','#EC4899','#14B8A6','#6366F1','#84CC16','#06B6D4','#A78BFA','#FB923C']}
+                seriesName="Frequency"
               />
             )}
           </CardPanel>
         )}
         <CardPanel
           title="Key Moment Types"
-          sub="AI identifies notable moments in each transcript (e.g. Customer Complaint, Hold, Escalation). Count = total occurrences across all interactions."
+          sub="Total occurrences of each moment type detected by AI across all calls. One call can have multiple moments (e.g. a complaint, then a hold, then a resolution)."
         >
           {moments.length === 0 ? (
             <EmptyState message="No key moment data." />
@@ -825,6 +826,8 @@ export default function InsightsPage() {
             <RankedBarChart
               items={moments.map((m) => ({ label: m.moment_type ?? m.type ?? m.label ?? m._id ?? 'Unknown', value: m.frequency ?? m.count ?? 0 }))}
               color="#8B5CF6"
+              seriesName="Occurrences"
+              valueFormatter={(v) => `${Number(v).toLocaleString()}x`}
             />
           )}
         </CardPanel>
