@@ -560,7 +560,7 @@ router.get('/insights/all', async (req, res) => {
   const params1 = channel ? [tenantId, channel] : [tenantId];
 
   try {
-    const [summary, categories, signals, complaints, moments, sentimentByAgent, productTypes, channelSentiment, fcrData] = await Promise.all([
+    const [summary, categories, signals, complaints, moments, sentimentByAgent, productTypes, channelSentiment, fcrData, signalsByChannel] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(DISTINCT ci.id) AS total_analysed,
@@ -707,6 +707,23 @@ router.get('/insights/all', async (req, res) => {
           GROUP BY case_id
         ) t
       `, [tenantId]),
+
+      // Signals broken down by channel (for case-mode channel attribution)
+      pool.query(`
+        SELECT
+          ci.channel,
+          COUNT(*) FILTER (WHERE cins.escalation_request=true) AS escalations,
+          COUNT(*) FILTER (WHERE cins.threat_detected=true) AS threats,
+          COUNT(*) FILTER (WHERE cins.social_media_mention=true) AS social_media,
+          COUNT(*) FILTER (WHERE cins.regulatory_mention=true) AS regulatory,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1
+        GROUP BY ci.channel
+        ORDER BY ci.channel
+      `, [tenantId]),
     ]);
 
     res.json({
@@ -719,6 +736,7 @@ router.get('/insights/all', async (req, res) => {
       productTypes: productTypes.rows,
       channelSentiment: channelSentiment.rows,
       fcrData: fcrData.rows[0] || {},
+      signalsByChannel: signalsByChannel.rows,
       locations: [],
       products: [],
     });

@@ -292,6 +292,7 @@ export default function InsightsPage() {
   const [productTypes, setProductTypes]     = useState([]);
   const [channelSentiment, setChannelSentiment] = useState([]);
   const [fcrData, setFcrData]               = useState({});
+  const [signalsByChannel, setSignalsByChannel] = useState([]);
 
   const [loading, setLoading]               = useState(true);
   const [error, setError]                   = useState(null);
@@ -353,8 +354,9 @@ export default function InsightsPage() {
         if (d.locations)        setLocations(d.locations);
         if (d.products)         setProducts(d.products);
         if (d.productTypes)     setProductTypes(d.productTypes);
-        if (d.channelSentiment) setChannelSentiment(d.channelSentiment);
-        if (d.fcrData)          setFcrData(d.fcrData);
+        if (d.channelSentiment)  setChannelSentiment(d.channelSentiment);
+        if (d.fcrData)           setFcrData(d.fcrData);
+        if (d.signalsByChannel)  setSignalsByChannel(d.signalsByChannel);
         setLoading(false);
       })
       .catch((e) => { if (cancelled) return; setError(e.message); setLoading(false); });
@@ -577,6 +579,34 @@ export default function InsightsPage() {
             );
           })}
         </div>
+
+        {/* Case-mode: channel attribution row for signals */}
+        {isCaseMode && signalsByChannel.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-border">
+            <div className="text-[10px] text-text-muted uppercase tracking-widest font-semibold mb-2">Channel breakdown</div>
+            <div className="flex flex-wrap gap-4">
+              {signalsByChannel.map((row) => {
+                const ch = row.channel ?? '—';
+                const icon = ch.toLowerCase() === 'voice' ? '📞' : ch.toLowerCase() === 'whatsapp' ? '💬' : '•';
+                const label = ch.toLowerCase() === 'voice' ? 'Voice' : ch.toLowerCase() === 'whatsapp' ? 'WhatsApp' : ch;
+                return (
+                  <div key={ch} className="flex items-center gap-2 text-xs text-text-label">
+                    <span className="text-base leading-none">{icon}</span>
+                    <span className="font-semibold text-text-main">{label}</span>
+                    <span className="text-text-muted">
+                      {Number(row.escalations) > 0 && <span className="mr-2">🔺 {row.escalations} escalation{row.escalations !== '1' ? 's' : ''}</span>}
+                      {Number(row.threats) > 0 && <span className="mr-2">⚠️ {row.threats} threat{row.threats !== '1' ? 's' : ''}</span>}
+                      {Number(row.negative) > 0 && <span className="mr-2">😠 {row.negative} negative</span>}
+                      {Number(row.social_media) > 0 && <span className="mr-2">📱 {row.social_media} social</span>}
+                      {Number(row.regulatory) > 0 && <span>⚖️ {row.regulatory} regulatory</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {signalFilter && (
           <div className="mt-2 text-xs text-text-muted">
             Filtering by: <span className="text-text-main font-semibold">{SIGNAL_CONFIGS[signalFilter]?.label}</span>
