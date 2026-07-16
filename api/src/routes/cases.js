@@ -740,4 +740,273 @@ router.get('/insights/status', async (req, res) => {
   }
 });
 
+// POST /api/cases/chat — grounded AI chat for case-mode tenants
+// Fetches real DB data first, injects as structured context, then calls Vertex AI
+router.post('/chat', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  const { message, history = [] } = req.body;
+
+  if (!message) return res.status(400).json({ error: 'Message required' });
+
+  try {
+    // ── 1. Fetch all relevant data from DB ──────────────────────────────────
+    const [
+      caseOverview,
+      agentPerf,
+      complaints,
+      categories,
+      channelSentiment,
+      fcrData,
+      signals,
+      moments,
+      recentCases,
+    ] = await Promise.all([
+      // Overall summary
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT c.id) AS total_cases,
+          COUNT(DISTINCT ci.id) AS total_interactions,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,1) AS avg_sentiment,
+          COUNT(DISTINCT ci.id) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive_interactions,
+          COUNT(DISTINCT ci.id) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative_interactions,
+          COUNT(DISTINCT ci.id) FILTER (WHERE cins.escalation_request=true) AS escalations,
+          COUNT(DISTINCT ci.id) FILTER (WHERE cins.threat_detected=true) AS threats
+        FROM cases c
+        JOIN case_interactions ci ON ci.case_id = c.id
+        LEFT JOIN case_insights cins ON cins.interaction_id = ci.id
+        WHERE c.tenant_id=$1
+      `, [tenantId]),
+
+      // Agent performance
+      pool.query(`
+        SELECT ci.agent_name,
+          COUNT(DISTINCT ci.case_id) AS cases,
+          COUNT(*) AS interactions,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,1) AS avg_sentiment,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative,
+          COUNT(*) FILTER (WHERE cins.escalation_request=true) AS escalations,
+          array_agg(DISTINCT ci.channel) AS channels
+        FROM case_interactions ci
+        LEFT JOIN case_insights cins ON cins.interaction_id = ci.id
+        WHERE ci.tenant_id=$1
+        GROUP BY ci.agent_name
+        ORDER BY avg_sentiment DESC
+        LIMIT 20
+      `, [tenantId]),
+
+      // Top complaint buckets
+      pool.query(`
+        SELECT
+          CASE
+            WHEN cins.call_subcategory ILIKE '%refund%' OR cins.call_subcategory ILIKE '%cancel%' THEN 'Refund / Cancellation'
+            WHEN cins.call_subcategory ILIKE '%modif%' OR cins.call_subcategory ILIKE '%change%' OR cins.call_subcategory ILIKE '%amend%' THEN 'Booking Modification'
+            WHEN cins.call_subcategory ILIKE '%baggage%' OR cins.call_subcategory ILIKE '%luggage%' THEN 'Baggage'
+            WHEN cins.call_subcategory ILIKE '%hotel%' THEN 'Hotel Issue'
+            WHEN cins.call_subcategory ILIKE '%boarding%' OR cins.call_subcategory ILIKE '%check-in%' OR cins.call_subcategory ILIKE '%check in%' THEN 'Check-in / Boarding'
+            WHEN cins.call_subcategory ILIKE '%flight%' OR cins.call_subcategory ILIKE '%ticket%' THEN 'Flight Issue'
+            WHEN cins.call_subcategory ILIKE '%name%' OR cins.call_subcategory ILIKE '%typo%' OR cins.call_subcategory ILIKE '%passenger%' THEN 'Passenger Details'
+            WHEN cins.call_subcategory ILIKE '%billing%' OR cins.call_subcategory ILIKE '%payment%' OR cins.call_subcategory ILIKE '%charge%' THEN 'Billing / Payment'
+            ELSE 'Other'
+          END AS complaint, COUNT(*) AS count
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1 AND cins.call_subcategory IS NOT NULL AND cins.call_subcategory <> ''
+        GROUP BY complaint ORDER BY count DESC
+      `, [tenantId]),
+
+      // Interaction categories
+      pool.query(`
+        SELECT cins.call_category AS category, COUNT(*) AS count,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,1) AS avg_sentiment
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1 AND cins.call_category IS NOT NULL AND cins.call_category <> ''
+        GROUP BY cins.call_category ORDER BY count DESC
+      `, [tenantId]),
+
+      // Channel sentiment
+      pool.query(`
+        SELECT ci.channel,
+          ROUND(AVG(cins.customer_sentiment_score)::numeric,1) AS avg_sentiment,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Positive') AS positive,
+          COUNT(*) FILTER (WHERE cins.customer_sentiment_overall='Negative') AS negative,
+          COUNT(*) AS total
+        FROM case_insights cins
+        JOIN case_interactions ci ON ci.id = cins.interaction_id
+        WHERE cins.tenant_id=$1
+        GROUP BY ci.channel
+      `, [tenantId]),
+
+      // FCR
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE interaction_count=1) AS single_touch,
+          COUNT(*) FILTER (WHERE interaction_count>1) AS multi_touch,
+          COUNT(*) AS total_cases,
+          ROUND(AVG(interaction_count)::numeric,2) AS avg_interactions,
+          MAX(interaction_count) AS max_interactions
+        FROM (
+          SELECT case_id, COUNT(*) AS interaction_count
+          FROM case_interactions WHERE tenant_id=$1
+          GROUP BY case_id
+        ) t
+      `, [tenantId]),
+
+      // Flagged signals
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE cins.threat_detected=true) AS threats,
+          COUNT(*) FILTER (WHERE cins.escalation_request=true) AS escalations,
+          COUNT(*) FILTER (WHERE cins.social_media_mention=true) AS social_media,
+          COUNT(*) FILTER (WHERE cins.regulatory_mention=true) AS regulatory
+        FROM case_insights cins
+        WHERE cins.tenant_id=$1
+      `, [tenantId]),
+
+      // Key moment types
+      pool.query(`
+        SELECT moment->>'type' AS moment_type, COUNT(*) AS frequency
+        FROM case_insights cins,
+          jsonb_array_elements(cins.key_moments) AS moment
+        WHERE cins.tenant_id=$1 AND cins.key_moments != '[]'::jsonb
+        GROUP BY moment->>'type' ORDER BY frequency DESC LIMIT 10
+      `, [tenantId]),
+
+      // 5 most recent cases for reference
+      pool.query(`
+        SELECT c.case_number, c.created_at::date AS date,
+          COUNT(ci.id) AS interactions,
+          array_agg(DISTINCT ci.channel) AS channels,
+          array_agg(DISTINCT ci.agent_name) AS agents
+        FROM cases c
+        JOIN case_interactions ci ON ci.case_id = c.id
+        WHERE c.tenant_id=$1
+        GROUP BY c.case_number, c.created_at
+        ORDER BY c.created_at DESC LIMIT 5
+      `, [tenantId]),
+    ]);
+
+    // ── 2. Build structured context string ──────────────────────────────────
+    const s = caseOverview.rows[0];
+    const fcr = fcrData.rows[0] || {};
+    const sigs = signals.rows[0] || {};
+    const fcrPct = fcr.total_cases > 0
+      ? Math.round(fcr.single_touch / fcr.total_cases * 100) : 0;
+
+    const sentimentLabel = (score) => {
+      if (score === null || score === undefined) return 'N/A';
+      if (score >= 65) return `${score} (Positive)`;
+      if (score >= 50) return `${score} (Neutral)`;
+      if (score >= 30) return `${score} (Mixed)`;
+      return `${score} (Negative)`;
+    };
+
+    const dataContext = `
+=== CASE OVERVIEW ===
+- Total unique cases: ${s.total_cases}
+- Total interactions (voice + WhatsApp): ${s.total_interactions}
+- Overall avg customer sentiment: ${sentimentLabel(s.avg_sentiment)} (scale 0–100)
+- Positive interactions: ${s.positive_interactions} | Negative: ${s.negative_interactions}
+- Escalations flagged: ${s.escalations} | Threats flagged: ${s.threats}
+
+=== FIRST CONTACT RESOLUTION (FCR) ===
+- Cases resolved in 1 interaction: ${fcr.single_touch} (${fcrPct}% FCR rate)
+- Multi-touch cases: ${fcr.multi_touch}
+- Avg interactions per case: ${fcr.avg_interactions}
+- Max interactions on a single case: ${fcr.max_interactions}
+
+=== SIGNAL INTELLIGENCE ===
+- Threats detected: ${sigs.threats}
+- Escalation requests: ${sigs.escalations}
+- Social media mentions: ${sigs.social_media}
+- Regulatory mentions: ${sigs.regulatory}
+
+=== INTERACTION CATEGORIES ===
+${categories.rows.map(c => `- ${c.category}: ${c.count} interactions, avg sentiment ${sentimentLabel(c.avg_sentiment)}`).join('\n') || '- No category data'}
+
+=== TOP ISSUE TYPES ===
+${complaints.rows.map(c => `- ${c.complaint}: ${c.count} interactions`).join('\n') || '- No complaint data'}
+
+=== CHANNEL BREAKDOWN ===
+${channelSentiment.rows.map(ch =>
+  `- ${ch.channel}: ${ch.total} interactions, avg sentiment ${sentimentLabel(ch.avg_sentiment)}, ${ch.positive} positive, ${ch.negative} negative`
+).join('\n') || '- No channel data'}
+
+=== KEY MOMENT TYPES (from AI analysis) ===
+${moments.rows.map(m => `- ${m.moment_type}: ${m.frequency} occurrences`).join('\n') || '- No moment data'}
+
+=== AGENT PERFORMANCE (top/bottom by sentiment) ===
+${agentPerf.rows.map(a =>
+  `- ${a.agent_name}: ${a.cases} cases, ${a.interactions} interactions, avg sentiment ${sentimentLabel(a.avg_sentiment)}, ${a.escalations} escalations, channels: ${(a.channels||[]).join('/')}`
+).join('\n') || '- No agent data'}
+
+=== RECENT CASES ===
+${recentCases.rows.map(c =>
+  `- Case ${c.case_number} (${c.date}): ${c.interactions} interactions via ${(c.channels||[]).join('/')}, agents: ${(c.agents||[]).join(', ')}`
+).join('\n') || '- No recent cases'}
+`.trim();
+
+    // ── 3. System prompt ────────────────────────────────────────────────────
+    const systemPrompt = `You are an AI analytics assistant for Almosafer, a travel company's customer experience team. You have access to structured data extracted from real customer case interactions (voice calls and WhatsApp chats).
+
+STRICT RULES:
+1. Answer ONLY based on the data provided below. Do not invent numbers, names, or patterns.
+2. If the answer is not in the data, say: "I don't have that information in the current dataset."
+3. Be concise and specific. Quote actual numbers from the data.
+4. Sentiment scores are 0–100: 0–29 = Negative, 30–49 = Mixed, 50–64 = Neutral, 65–100 = Positive.
+5. Do not speculate about causes unless clearly supported by the data.
+6. When asked about "calls", understand this includes both voice and WhatsApp interactions.
+
+${dataContext}
+
+You may use this data to answer questions about case volumes, agent performance, customer sentiment, complaint patterns, FCR, escalations, and channel comparisons. For anything outside this data scope, clearly say so.`;
+
+    // ── 4. Call Vertex AI ───────────────────────────────────────────────────
+    const { GoogleAuth } = require('google-auth-library');
+    if (!router._authClient) {
+      router._authClient = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+    }
+    const client = await router._authClient.getClient();
+    const tokenResult = await client.getAccessToken();
+    const accessToken = tokenResult.token;
+
+    const VERTEX_PROJECT  = process.env.VERTEX_PROJECT  || 'veyn-whatsapp-bot';
+    const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-central1';
+    const VERTEX_MODEL    = 'gemini-2.5-flash';
+    const VERTEX_API      = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
+
+    const contents = [
+      ...history.map(h => ({ role: h.role === 'bot' ? 'model' : h.role, parts: [{ text: h.content }] })),
+      { role: 'user', parts: [{ text: message }] },
+    ];
+
+    const vertexRes = await fetch(VERTEX_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 700,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+
+    const vertexData = await vertexRes.json();
+    if (!vertexRes.ok) {
+      console.error('Cases chat Vertex error:', JSON.stringify(vertexData));
+      return res.status(500).json({ error: vertexData.error?.message || 'Vertex AI error' });
+    }
+
+    const reply = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
+    res.json({ reply });
+
+  } catch (e) {
+    console.error('Cases chat error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

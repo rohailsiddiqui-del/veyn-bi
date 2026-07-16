@@ -3,10 +3,17 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/app/components/ui';
 
-const WELCOME = {
+const WELCOME_STANDARD = {
   id: 'welcome',
   role: 'bot',
   text: "Hello! I'm **Veyn AI**, your intelligent call analytics assistant. Ask me anything about your call data — agent performance, trends, customer sentiment, or specific calls.",
+  ts: Date.now(),
+};
+
+const WELCOME_CASE = {
+  id: 'welcome',
+  role: 'bot',
+  text: "Hello! I'm **Veyn AI**, your Almosafer CX analytics assistant. I have access to your **57 cases** and **188 interactions** across voice and WhatsApp.\n\nYou can ask me things like:\n- Which agents have the most escalations?\n- What are the top customer complaints?\n- How does sentiment compare between voice and WhatsApp?\n- What is our FCR rate?\n- Which case type has the worst sentiment?",
   ts: Date.now(),
 };
 
@@ -65,8 +72,9 @@ function TypingIndicator() {
 }
 
 export default function ChatPage() {
-  const { apiFetch, token, globalDateFrom, globalDateTo } = useAuth();
-  const [messages, setMessages] = useState([WELCOME]);
+  const { apiFetch, token, user, globalDateFrom, globalDateTo } = useAuth();
+  const isCaseMode = user?.dashboard_mode === 'case';
+  const [messages, setMessages] = useState([isCaseMode ? WELCOME_CASE : WELCOME_STANDARD]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const [geminiError, setGeminiError] = useState(false);
@@ -95,10 +103,15 @@ export default function ChatPage() {
       .map((m) => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text }));
 
     try {
-      const data = await apiFetch('/api/chat', {
+      const endpoint = isCaseMode ? '/api/cases/chat' : '/api/chat';
+      const bodyPayload = isCaseMode
+        ? { message: text, history }
+        : { message: text, history, dateFrom: globalDateFrom || null, dateTo: globalDateTo || null };
+
+      const data = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history, dateFrom: globalDateFrom || null, dateTo: globalDateTo || null }),
+        body: JSON.stringify(bodyPayload),
       });
 
       const reply = data.reply ?? data.message ?? data.text ?? JSON.stringify(data);
@@ -146,7 +159,11 @@ export default function ChatPage() {
       <div className="flex-shrink-0 mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-main tracking-tight">AI Chat</h1>
-          <p className="text-sm text-text-muted mt-0.5">Ask Veyn AI about your call analytics</p>
+          <p className="text-sm text-text-muted mt-0.5">
+            {isCaseMode
+              ? 'Ask about cases, interactions, agent performance, and CX insights — answers are grounded in your actual data'
+              : 'Ask Veyn AI about your call analytics'}
+          </p>
         </div>
         {(globalDateFrom || globalDateTo) && (
           <div className="text-xs px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary-soft">
@@ -189,7 +206,10 @@ export default function ChatPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything about your call data… (Enter to send, Shift+Enter for new line)"
+          placeholder={isCaseMode
+            ? "Ask about cases, agents, complaints, FCR, or sentiment… (Enter to send)"
+            : "Ask anything about your call data… (Enter to send, Shift+Enter for new line)"
+          }
           rows={2}
           disabled={typing}
           style={{ maxHeight: 140, backgroundColor: '#1e2130', color: '#e2e8f0', border: '1px solid #334155', borderRadius: 12, padding: '12px 16px', fontSize: 14, resize: 'none', outline: 'none', flex: 1 }}

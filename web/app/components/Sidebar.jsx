@@ -91,7 +91,7 @@ export default function Sidebar({ activePage, onNavigate }) {
       {/* Nav */}
       <nav className="flex-1 p-3 overflow-y-auto">
         {user?.dashboard_mode === 'case' ? (
-          /* Case-mode: only Case Trajectory + Insights */
+          /* Case-mode: Case Trajectory + Insights + AI Chat */
           <>
             <button
               onClick={() => onNavigate('cases')}
@@ -106,6 +106,13 @@ export default function Sidebar({ activePage, onNavigate }) {
             >
               <Brain size={16} className="flex-shrink-0" />
               <span>Insights</span>
+            </button>
+            <button
+              onClick={() => onNavigate('chat')}
+              className={cn('nav-item w-full text-left mb-0.5', activePage === 'chat' && 'active')}
+            >
+              <MessageSquare size={16} className="flex-shrink-0" />
+              <span>AI Chat</span>
             </button>
           </>
         ) : (
