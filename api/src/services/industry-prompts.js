@@ -78,6 +78,18 @@ For call_subcategory examples: 'Admission Query', 'Fee Dispute', 'Course Schedul
 For regulatory_mention, flag references to HEC, accreditation bodies, or education ministry.
 `,
 
+  footwear: `
+INDUSTRY CONTEXT — Footwear Retail:
+This is a footwear brand (shoes, sandals, sneakers, boots, etc.). Focus on the most common footwear-specific CX pain points.
+Focus on mandatory CX metrics: First Contact Resolution (FCR), Agent Empathy, Sizing & Fit Accuracy, Ease of Exchange/Return, Product Quality & Durability, Delivery Speed, and Stock Availability.
+Focus on issues specific to footwear: wrong shoe size delivered, size not available, shoe quality complaints (sole detachment, stitching issues, colour fading), exchange/return requests, delivery delays, damaged packaging, discount/sale pricing disputes, fake or damaged product claims, and out-of-stock queries.
+For call_category, prefer: Returns, Delivery, Complaint, Inquiry, Billing, Feedback.
+For call_subcategory examples: 'Wrong Size Delivered', 'Size Exchange Request', 'Shoe Quality Complaint', 'Sole Detachment', 'Refund Request', 'Out of Stock Size', 'Delivery Not Received', 'Damaged Product', 'Discount Not Applied', 'Color Mismatch'.
+Flag upsell/cross-sell moments in key_moments when agent successfully recommended an alternative size, style, or related product.
+Flag any mention of fake or counterfeit product claims as threat_detected=true.
+For regulatory_mention, flag any references to consumer court, PSQCA, or consumer protection authority.
+`,
+
   generic: `
 INDUSTRY CONTEXT — General:
 Analyze this call using standard customer service best practices. Identify the core issue, customer sentiment, and agent performance. Flag any escalation risks, threats, or regulatory mentions relevant to the business context evident from the transcript.
