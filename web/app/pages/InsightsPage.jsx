@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { KpiCard, CardPanel, Badge, Button, Select, Spinner, EmptyState } from '@/app/components/ui';
-import { Phone, MessageSquare } from 'lucide-react';
+import { Phone, MessageSquare, Search, X } from 'lucide-react';
 import { DoughnutChart, BarChart, RadialGauge, RankedBarChart } from '@/app/components/Charts';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -53,16 +53,25 @@ function SentimentBar({ agentName, score }) {
 // ─── signal card ────────────────────────────────────────────────────────────
 
 function SignalCard({ emoji, label, count, colorClass, onClick, active }) {
+  const numericCount = count != null && count !== '—' ? Number(count) : null;
+  const hasSignals = numericCount != null && numericCount > 0;
   return (
     <button
       onClick={onClick}
-      className={`group relative flex flex-col gap-1 rounded-xl border p-4 text-left transition-all duration-200 cursor-pointer w-full
-        ${active ? 'border-current ' + colorClass.border : 'border-border hover:border-border2'}
+      className={`group relative flex flex-col gap-1.5 rounded-xl border p-3.5 text-left transition-all duration-200 cursor-pointer w-full
+        ${active ? colorClass.border + ' ring-1 ring-current/20' : 'border-border hover:border-border2'}
         ${colorClass.bg}`}
     >
-      <div className="text-2xl">{emoji}</div>
-      <div className={`text-2xl font-bold leading-none ${colorClass.text}`}>{count ?? '—'}</div>
-      <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">{label}</div>
+      <div className="flex items-center justify-between">
+        <span className="text-xl leading-none">{emoji}</span>
+        {hasSignals && active && (
+          <span className={`text-[9px] font-bold uppercase tracking-wider ${colorClass.text} opacity-70`}>active</span>
+        )}
+      </div>
+      <div className={`text-2xl font-bold leading-none tabular-nums ${colorClass.text}`}>
+        {count ?? '—'}
+      </div>
+      <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wide leading-tight">{label}</div>
     </button>
   );
 }
@@ -303,6 +312,7 @@ export default function InsightsPage() {
   const [expandedCallId, setExpandedCallId] = useState(null);
   const [deletingCallId, setDeletingCallId] = useState(null);
   const [channelFilter, setChannelFilter]   = useState(null);
+  const [searchQuery, setSearchQuery]       = useState('');
 
   const deleteCall = useCallback(async (callId, e) => {
     e.stopPropagation();
@@ -435,7 +445,7 @@ export default function InsightsPage() {
   };
   const SIGNAL_ORDER = ['threats', 'social', 'escalations', 'regulatory', 'negative', 'positive'];
 
-  const displayedSignals = signalFilter
+  const filteredBySignal = signalFilter
     ? signals.filter((s) => {
         if (signalFilter === 'negative') return s.customer_sentiment_overall?.toLowerCase() === 'negative';
         if (signalFilter === 'positive') return s.customer_sentiment_overall?.toLowerCase() === 'positive';
@@ -447,6 +457,19 @@ export default function InsightsPage() {
         return types.includes(SIGNAL_TYPE_MAP[signalFilter]);
       })
     : signals;
+
+  const displayedSignals = searchQuery.trim()
+    ? filteredBySignal.filter((s) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          (s.call_ref ?? '').toLowerCase().includes(q) ||
+          (s.agent_name ?? '').toLowerCase().includes(q) ||
+          (s.call_category ?? '').toLowerCase().includes(q) ||
+          (s.customer_sentiment_overall ?? '').toLowerCase().includes(q) ||
+          (s.summary ?? '').toLowerCase().includes(q)
+        );
+      })
+    : filteredBySignal;
 
   // sentiment distribution has data if any count > 0
   const sentHasData = sentCounts.some(v => v > 0);
@@ -629,15 +652,26 @@ export default function InsightsPage() {
       {/* ── 5. Flagged Interactions Table ── */}
       <CardPanel
         title={isCaseMode ? 'Flagged Interactions' : 'Flagged Calls'}
-        sub={
-          signalType === 'negative' ? (isCaseMode ? 'Interactions with Negative customer sentiment.' : 'Calls with Negative customer sentiment.')
-          : signalType === 'positive' ? (isCaseMode ? 'Interactions with Positive customer sentiment.' : 'Calls with Positive customer sentiment.')
-          : isCaseMode ? 'Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue).'
-          : 'Calls where AI detected at least one signal.'
-        }
+        sub={`${displayedSignals.length} of ${filteredBySignal.length} shown${searchQuery ? ' · search active' : ''}`}
         action={
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-muted">Signal type</span>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Search */}
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search agent, ref, category…"
+                className="bg-bg border border-border2 rounded-lg pl-7 pr-7 py-1.5 text-xs text-text-main outline-none focus:border-primary transition-colors w-[200px]"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main">
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+            {/* Signal type filter */}
             <Select id="signal-type-filter" value={signalType} onChange={(e) => {
               setSignalType(e.target.value);
               setSignalFilter(null);

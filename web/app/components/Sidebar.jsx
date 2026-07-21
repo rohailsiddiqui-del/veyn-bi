@@ -2,22 +2,45 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { cn } from '@/app/lib/utils';
-import { Button } from '@/app/components/ui';
 import {
   LayoutDashboard, Users, Target, TrendingUp, Brain, MessageSquare,
   Upload, Bell, LogOut, Moon, Sun, Download, ChevronDown, ShieldCheck, GitBranch,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'agents', label: 'Agents', icon: Users },
-  { id: 'params', label: 'Parameters', icon: Target },
-  { id: 'trend', label: 'Trends', icon: TrendingUp },
-  { id: 'insights', label: 'Insights', icon: Brain },
-  { id: 'chat', label: 'AI Chat', icon: MessageSquare },
-  { id: 'upload', label: 'Upload', icon: Upload },
-  { id: 'settings', label: 'Settings', icon: Bell },
+  { id: 'overview', label: 'Overview',    icon: LayoutDashboard },
+  { id: 'agents',   label: 'Agents',      icon: Users },
+  { id: 'params',   label: 'Parameters',  icon: Target },
+  { id: 'trend',    label: 'Trends',      icon: TrendingUp },
+  { id: 'insights', label: 'Insights',    icon: Brain },
+  { id: 'chat',     label: 'AI Chat',     icon: MessageSquare },
+  { id: 'upload',   label: 'Upload',      icon: Upload },
+  { id: 'settings', label: 'Settings',    icon: Bell },
 ];
+
+function NavButton({ id, label, icon: Icon, active, onClick }) {
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={cn(
+        'nav-item w-full text-left mb-0.5 relative group',
+        active && 'active'
+      )}
+    >
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
+      )}
+      <Icon
+        size={15}
+        className={cn(
+          'flex-shrink-0 ml-0.5 transition-colors',
+          active ? 'text-primary-soft' : 'text-text-muted group-hover:text-text-main'
+        )}
+      />
+      <span className="flex-1">{label}</span>
+    </button>
+  );
+}
 
 export default function Sidebar({ activePage, onNavigate }) {
   const { user, logout, theme, setTheme, apiFetch } = useAuth();
@@ -71,84 +94,78 @@ export default function Sidebar({ activePage, onNavigate }) {
     URL.revokeObjectURL(a.href);
   }
 
-  return (
-    <aside className="fixed left-0 top-0 h-screen w-[220px] bg-surface border-r border-border flex flex-col z-40"
-      style={{ backgroundImage: 'linear-gradient(to bottom, rgba(139,92,246,0.06) 0%, transparent 80px)' }}>
-      
-      {/* Top accent line */}
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-primary-soft to-transparent" />
+  const isCaseMode = user?.dashboard_mode === 'case';
+  const orgInitial = (user?.tenantName || 'V').charAt(0).toUpperCase();
 
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-border">
-        <div className="text-lg font-bold bg-gradient-to-r from-primary-soft to-primary bg-clip-text text-transparent">
-          ⚡ Veyn.ai
+  return (
+    <aside
+      className="fixed left-0 top-0 h-screen w-[220px] bg-surface border-r border-border flex flex-col z-40"
+      style={{ backgroundImage: 'linear-gradient(to bottom, rgba(139,92,246,0.05) 0%, transparent 100px)' }}
+    >
+      {/* Top accent line */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-primary-soft to-transparent" />
+
+      {/* Logo / Org */}
+      <div className="px-4 py-4 border-b border-border flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary-soft flex items-center justify-center text-white text-xs font-bold shrink-0">
+          {orgInitial}
         </div>
-        <div className="text-[10px] text-text-muted uppercase tracking-widest mt-0.5" id="sidebar-org-name">
-          {user?.tenantName || 'CX Intelligence'}
+        <div className="min-w-0">
+          <div className="text-sm font-bold text-text-main leading-tight truncate">
+            {user?.tenantName || 'Veyn.ai'}
+          </div>
+          <div className="text-[9px] text-text-muted uppercase tracking-widest leading-tight mt-0.5">
+            CX Intelligence
+          </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 overflow-y-auto">
-        {user?.dashboard_mode === 'case' ? (
-          /* Case-mode: Case Trajectory + Insights + AI Chat */
+      <nav className="flex-1 p-2.5 overflow-y-auto">
+        {isCaseMode ? (
           <>
-            <button
-              onClick={() => onNavigate('cases')}
-              className={cn('nav-item w-full text-left mb-0.5', activePage === 'cases' && 'active')}
-            >
-              <GitBranch size={16} className="flex-shrink-0" />
-              <span>Case Trajectory</span>
-            </button>
-            <button
-              onClick={() => onNavigate('insights')}
-              className={cn('nav-item w-full text-left mb-0.5', activePage === 'insights' && 'active')}
-            >
-              <Brain size={16} className="flex-shrink-0" />
-              <span>Insights</span>
-            </button>
-            <button
-              onClick={() => onNavigate('chat')}
-              className={cn('nav-item w-full text-left mb-0.5', activePage === 'chat' && 'active')}
-            >
-              <MessageSquare size={16} className="flex-shrink-0" />
-              <span>AI Chat</span>
-            </button>
+            <NavButton id="cases"    label="Case Trajectory" icon={GitBranch}     active={activePage === 'cases'}    onClick={onNavigate} />
+            <NavButton id="insights" label="Insights"        icon={Brain}         active={activePage === 'insights'} onClick={onNavigate} />
+            <NavButton id="chat"     label="AI Chat"         icon={MessageSquare} active={activePage === 'chat'}     onClick={onNavigate} />
           </>
         ) : (
-          /* Standard mode: full nav */
-          NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => onNavigate(id)}
-              className={cn('nav-item w-full text-left mb-0.5', activePage === id && 'active')}
-            >
-              <Icon size={16} className="flex-shrink-0" />
-              <span>{label}</span>
-            </button>
-          ))
+          <>
+            <div className="mb-1.5 px-2 pt-1 text-[9px] font-semibold text-text-muted uppercase tracking-widest">
+              Analytics
+            </div>
+            {NAV_ITEMS.slice(0, 5).map(({ id, label, icon }) => (
+              <NavButton key={id} id={id} label={label} icon={icon} active={activePage === id} onClick={onNavigate} />
+            ))}
+            <div className="my-2 border-t border-border" />
+            <div className="mb-1.5 px-2 pt-1 text-[9px] font-semibold text-text-muted uppercase tracking-widest">
+              Manage
+            </div>
+            {NAV_ITEMS.slice(5).map(({ id, label, icon }) => (
+              <NavButton key={id} id={id} label={label} icon={icon} active={activePage === id} onClick={onNavigate} />
+            ))}
+          </>
         )}
 
-        {/* Superadmin only */}
+        {/* Superadmin */}
         {user?.role === 'superadmin' && (
           <>
             <div className="my-2 border-t border-border" />
-            <button
-              onClick={() => onNavigate('admin')}
-              className={cn('nav-item w-full text-left mb-0.5', activePage === 'admin' && 'active')}
-            >
-              <ShieldCheck size={16} className="flex-shrink-0" />
-              <span>Admin</span>
-            </button>
+            <NavButton id="admin" label="Admin" icon={ShieldCheck} active={activePage === 'admin'} onClick={onNavigate} />
           </>
         )}
       </nav>
 
       {/* Bottom section */}
-      <div className="p-4 border-t border-border space-y-3">
-        <div>
-          <div className="text-sm font-semibold text-text-main truncate">{user?.tenantName || '—'}</div>
-          <div className="text-xs text-text-muted mt-0.5">{user?.role} · {user?.industry || 'generic'}</div>
+      <div className="p-3 border-t border-border space-y-2.5">
+        {/* User info */}
+        <div className="flex items-center gap-2 px-1">
+          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary-soft text-[10px] font-bold shrink-0">
+            {orgInitial}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-text-main truncate">{user?.tenantName || '—'}</div>
+            <div className="text-[9px] text-text-muted capitalize">{user?.role} · {user?.industry || 'generic'}</div>
+          </div>
         </div>
 
         {/* Export dropdown */}
@@ -157,20 +174,29 @@ export default function Sidebar({ activePage, onNavigate }) {
             onClick={(e) => { e.stopPropagation(); setExportOpen(!exportOpen); }}
             className="btn-outline w-full flex items-center justify-between text-[11px] py-1.5"
           >
-            <span className="flex items-center gap-1.5"><Download size={12} /> Export</span>
-            <ChevronDown size={12} className={cn('transition-transform', exportOpen && 'rotate-180')} />
+            <span className="flex items-center gap-1.5">
+              <Download size={11} />
+              Export Data
+            </span>
+            <ChevronDown size={11} className={cn('transition-transform duration-200', exportOpen && 'rotate-180')} />
           </button>
           {exportOpen && (
             <div className="absolute bottom-full left-0 mb-1 w-full bg-surface border border-border2 rounded-xl shadow-2xl overflow-hidden z-50">
-              <div className="px-3 py-1.5 text-[10px] text-text-muted uppercase tracking-widest font-semibold border-b border-border">Download</div>
-              {[['flagged', '📋 Flagged Calls CSV'],['agents','👥 Agent Performance CSV'],['params','🎯 Parameter Analysis CSV']].map(([t,l]) => (
+              <div className="px-3 py-1.5 text-[10px] text-text-muted uppercase tracking-widest font-semibold border-b border-border">
+                Download
+              </div>
+              {[
+                ['flagged',  '📋 Flagged Calls CSV'],
+                ['agents',   '👥 Agent Performance CSV'],
+                ['params',   '🎯 Parameter Analysis CSV'],
+              ].map(([t, l]) => (
                 <button key={t} onClick={() => exportCSV(t)}
                   className="w-full text-left px-3 py-2.5 text-xs text-text-label hover:bg-surface2 hover:text-text-main transition-colors border-b border-border last:border-0">
                   {l}
                 </button>
               ))}
               <button onClick={() => { setExportOpen(false); window.print(); }}
-                className="w-full text-left px-3 py-2.5 text-xs text-text-label hover:bg-surface2 hover:text-text-main transition-colors border-b border-border">
+                className="w-full text-left px-3 py-2.5 text-xs text-text-label hover:bg-surface2 hover:text-text-main transition-colors">
                 🖨 Print / PDF
               </button>
             </div>
@@ -178,19 +204,20 @@ export default function Sidebar({ activePage, onNavigate }) {
         </div>
 
         {/* Theme toggle */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           <button onClick={() => setTheme('dark')}
             className={cn('flex-1 py-1 text-[10px] rounded-md border transition-all', theme === 'dark' ? 'border-primary text-primary-soft bg-primary/10' : 'border-border2 text-text-muted bg-surface2')}>
-            <Moon size={10} className="inline mr-1" />Dark
+            <Moon size={9} className="inline mr-1" />Dark
           </button>
           <button onClick={() => setTheme('light')}
             className={cn('flex-1 py-1 text-[10px] rounded-md border transition-all', theme === 'light' ? 'border-primary text-primary-soft bg-primary/10' : 'border-border2 text-text-muted bg-surface2')}>
-            <Sun size={10} className="inline mr-1" />Light
+            <Sun size={9} className="inline mr-1" />Light
           </button>
         </div>
 
-        <button onClick={logout} className="flex items-center gap-1.5 text-xs text-text-muted hover:text-danger transition-colors">
-          <LogOut size={12} /> Sign out
+        <button onClick={logout} className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-danger transition-colors w-full px-1 py-0.5">
+          <LogOut size={11} />
+          Sign out
         </button>
       </div>
     </aside>

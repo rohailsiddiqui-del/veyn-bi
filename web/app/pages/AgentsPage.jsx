@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, Fragment } from 'react';
 import { CardPanel, Badge, Button, Spinner, EmptyState } from '@/app/components/ui';
 import { BarChart } from '@/app/components/Charts';
 import { useAuth } from '@/app/context/AuthContext';
+import { Search, X } from 'lucide-react';
 
 function scoreVariant(score) {
   const s = Number(score);
@@ -98,6 +99,7 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [deletingAgent, setDeletingAgent] = useState(null);
+  const [search, setSearch] = useState('');
 
   const loadAgents = useCallback(async () => {
     setLoading(true);
@@ -151,6 +153,13 @@ export default function AgentsPage() {
   const avgScores = agents.map((a) => Number(a.avg_score ?? 0));
   const callVolumes = agents.map((a) => Number(a.total_calls ?? 0));
 
+  const filteredAgents = search.trim()
+    ? agents.filter((a) => {
+        const name = (a.agent_name || a.name || '').toLowerCase();
+        return name.includes(search.toLowerCase());
+      })
+    : agents;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Page title */}
@@ -181,7 +190,27 @@ export default function AgentsPage() {
       </div>
 
       {/* Leaderboard */}
-      <CardPanel title="Leaderboard">
+      <CardPanel
+        title="Leaderboard"
+        sub={`${filteredAgents.length} agent${filteredAgents.length !== 1 ? 's' : ''}${search ? ' · filtered' : ''}`}
+        action={
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search agent…"
+              className="bg-bg border border-border2 rounded-lg pl-7 pr-7 py-1.5 text-xs text-text-main outline-none focus:border-primary transition-colors w-[160px]"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main">
+                <X size={11} />
+              </button>
+            )}
+          </div>
+        }
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -199,7 +228,10 @@ export default function AgentsPage() {
               </tr>
             </thead>
             <tbody>
-              {agents.map((agent, idx) => {
+              {filteredAgents.length === 0 ? (
+                <tr><td colSpan={9} className="py-8 text-center text-text-muted text-sm">No agents match "{search}"</td></tr>
+              ) : null}
+              {filteredAgents.map((agent, idx) => {
                 const name = agent.agent_name || agent.name || (typeof agent === 'string' ? agent : `agent-${idx}`);
                 const isExpanded = expandedAgent === name;
                 const isDeleting = deletingAgent === name;
@@ -213,8 +245,11 @@ export default function AgentsPage() {
                         isExpanded ? 'bg-surface2' : ''
                       }`}
                     >
-                      <td className="py-3 px-3 pl-0 text-text-muted font-semibold text-xs">
-                        {idx + 1}
+                      <td className="py-3 px-3 pl-0 text-center">
+                        {idx === 0 ? <span title="1st">🥇</span>
+                          : idx === 1 ? <span title="2nd">🥈</span>
+                          : idx === 2 ? <span title="3rd">🥉</span>
+                          : <span className="text-text-muted font-semibold text-xs">{idx + 1}</span>}
                       </td>
                       <td className="py-3 px-3 font-semibold text-text-main whitespace-nowrap">
                         <div className="flex items-center gap-2">
