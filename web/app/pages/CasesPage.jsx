@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { Spinner } from '@/app/components/ui';
 import {
   FolderOpen, Users, TrendingUp, CheckCircle,
   Phone, MessageSquare, ChevronRight, ArrowLeft, Search,
-  BarChart2, X, Upload, FileSpreadsheet, FileText, ChevronDown
+  BarChart2, X, ChevronUp, ChevronDown, ChevronsUpDown
 } from 'lucide-react';
 
 const SCORE_BG = {
@@ -14,6 +14,12 @@ const SCORE_BG = {
   na:   'bg-slate-700/40 text-slate-500 border-slate-600/30',
 };
 const CHANNEL_ICON = { Voice: Phone, WhatsApp: MessageSquare };
+
+// Strip leading [YYYY-MM-DD HH:MM:SS] timestamps from each transcript line.
+function stripTimestamps(text) {
+  if (!text) return text;
+  return text.replace(/^\s*\[[^\]]*\]\s*/gm, '');
+}
 
 function StatCard({ label, value, sub, icon: Icon, color = 'text-primary-soft' }) {
   return (
@@ -169,8 +175,8 @@ function CaseDetail({ caseNumber, onBack }) {
                       {interaction.translation && (
                         <div className="mt-4 border-t border-border pt-4">
                           <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Transcript (EN)</div>
-                          <p className="text-xs text-text-label leading-relaxed bg-surface2 rounded-lg p-3 max-h-48 overflow-y-auto">
-                            {interaction.translation}
+                          <p className="text-xs text-text-label leading-relaxed bg-surface2 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                            {stripTimestamps(interaction.translation)}
                           </p>
                         </div>
                       )}
@@ -188,10 +194,9 @@ function CaseDetail({ caseNumber, onBack }) {
 
 // ── Cases Overview ────────────────────────────────────────────────────────────
 export default function CasesPage() {
-  const { apiFetch, token, apiBase } = useAuth();
+  const { apiFetch } = useAuth();
   const [overview, setOverview] = useState(null);
-  const [cases, setCases] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [allCases, setAllCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -200,63 +205,20 @@ export default function CasesPage() {
   const [activeTab, setActiveTab] = useState('cases');
   const [agentData, setAgentData] = useState(null);
   const [agentsLoading, setAgentsLoading] = useState(false);
+  const [sort, setSort] = useState({ key: 'total_interactions', dir: 'desc' });
   const limit = 15;
-
-  // Upload panel state
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [evalFile, setEvalFile] = useState(null);
-  const [transFile, setTransFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-
-  async function doUpload() {
-    if (!evalFile) { setUploadResult({ type: 'error', msg: 'Select an Evaluation file (XLSX).' }); return; }
-    const fd = new FormData();
-    fd.append('eval', evalFile);
-    if (transFile) fd.append('trans', transFile);
-    setUploading(true);
-    setUploadResult({ type: 'loading', msg: 'Uploading and processing...' });
-    try {
-      const res = await fetch(apiBase + '/api/cases/upload', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setUploadResult({ type: 'error', msg: data.error || 'Upload failed.' });
-      } else {
-        setUploadResult({
-          type: 'success',
-          msg: `Done — ${data.cases} cases, ${data.interactions} interactions, ${data.scores} scores ingested.`,
-        });
-        setEvalFile(null); setTransFile(null);
-        // Refresh overview + cases
-        loadOverview();
-        setPage(1); setSearch(''); setSearchInput('');
-        setAgentData(null);
-      }
-    } catch (e) {
-      setUploadResult({ type: 'error', msg: e.message });
-    } finally {
-      setUploading(false);
-    }
-  }
 
   const loadOverview = useCallback(async () => {
     const data = await apiFetch('/api/cases');
     setOverview(data);
-  }, []);
+  }, [apiFetch]);
 
-  const loadCases = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page, limit });
-    if (search) params.set('search', search);
-    const data = await apiFetch(`/api/cases/list?${params}`);
-    setCases(data.cases || []);
-    setTotal(data.total || 0);
+    const data = await apiFetch('/api/cases/list?page=1&limit=1000');
+    setAllCases(data.cases || []);
     setLoading(false);
-  }, [page, search]);
+  }, [apiFetch]);
 
   const loadAgents = useCallback(async () => {
     if (agentData) return;
@@ -264,11 +226,42 @@ export default function CasesPage() {
     const data = await apiFetch('/api/cases/agents/performance');
     setAgentData(data.agents || []);
     setAgentsLoading(false);
-  }, [agentData]);
+  }, [agentData, apiFetch]);
 
-  useEffect(() => { loadOverview(); }, []);
-  useEffect(() => { loadCases(); }, [page, search]);
-  useEffect(() => { if (activeTab === 'agents') loadAgents(); }, [activeTab]);
+  useEffect(() => { loadOverview(); loadAll(); }, [loadOverview, loadAll]);
+  useEffect(() => { if (activeTab === 'agents') loadAgents(); }, [activeTab, loadAgents]);
+  useEffect(() => { setPage(1); }, [search, sort]);
+
+  const sortVal = (c, key) => {
+    switch (key) {
+      case 'case_number': { const n = Number(c.case_number); return isNaN(n) ? c.case_number : n; }
+      case 'total_interactions': return Number(c.total_interactions) || 0;
+      case 'channels': return (c.channels || []).length;
+      case 'agents': return (c.agents || []).length;
+      case 'pass_rate': return c.pass_rate == null ? -1 : parseFloat(c.pass_rate);
+      default: return 0;
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let rows = allCases;
+    if (search) rows = rows.filter(c => String(c.case_number).toLowerCase().includes(search.toLowerCase()));
+    const { key, dir } = sort;
+    const mult = dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const va = sortVal(a, key), vb = sortVal(b, key);
+      if (va < vb) return -1 * mult;
+      if (va > vb) return 1 * mult;
+      return String(a.case_number).localeCompare(String(b.case_number));
+    });
+  }, [allCases, search, sort]);
+
+  const total = filtered.length;
+  const pageRows = filtered.slice((page - 1) * limit, page * limit);
+
+  const toggleSort = (key) => setSort(s =>
+    s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+                  : { key, dir: key === 'case_number' ? 'asc' : 'desc' });
 
   if (selectedCase) {
     return <CaseDetail caseNumber={selectedCase} onBack={() => setSelectedCase(null)} />;
@@ -278,60 +271,22 @@ export default function CasesPage() {
   const channels = overview?.channels || [];
   const topFails = overview?.topFailingSubparams || [];
 
+  const SortHeader = ({ label, sortKey, align = 'left' }) => (
+    <th className={`px-4 py-3 text-${align}`}>
+      <button
+        onClick={() => toggleSort(sortKey)}
+        className="inline-flex items-center gap-1 uppercase hover:text-text-main transition-colors"
+      >
+        {label}
+        {sort.key === sortKey
+          ? (sort.dir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)
+          : <ChevronsUpDown size={12} className="opacity-30" />}
+      </button>
+    </th>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Upload panel */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <button
-          onClick={() => { setUploadOpen(o => !o); setUploadResult(null); }}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-text-label hover:bg-surface2 transition-colors"
-        >
-          <span className="flex items-center gap-2"><Upload size={14} className="text-primary-soft" /> Upload New Data</span>
-          <ChevronDown size={14} className={`text-text-muted transition-transform ${uploadOpen ? 'rotate-180' : ''}`} />
-        </button>
-        {uploadOpen && (
-          <div className="border-t border-border p-4 space-y-4">
-            <p className="text-xs text-text-muted">
-              Upload a new <span className="font-semibold text-text-label">Evaluation XLSX</span> (required) and optionally a <span className="font-semibold text-text-label">Transcripts CSV</span>.
-              Re-uploading the same cases will replace existing data.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <CaseFileDrop
-                icon={<FileSpreadsheet size={24} className="text-primary-soft" />}
-                label="Evaluation XLSX"
-                sub="Required — case scores"
-                accept=".xlsx,.xls,.csv"
-                file={evalFile}
-                onChange={setEvalFile}
-              />
-              <CaseFileDrop
-                icon={<FileText size={24} className="text-text-muted" />}
-                label="Transcripts CSV"
-                sub="Optional — adds transcripts"
-                accept=".csv"
-                file={transFile}
-                onChange={setTransFile}
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={doUpload}
-                disabled={uploading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors"
-              >
-                <Upload size={13} className={uploading ? 'animate-pulse' : ''} />
-                {uploading ? 'Processing...' : 'Upload & Process'}
-              </button>
-              {uploadResult && (
-                <span className={`text-sm ${uploadResult.type === 'success' ? 'text-emerald-400' : uploadResult.type === 'error' ? 'text-red-400' : 'text-text-muted'}`}>
-                  {uploadResult.msg}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Total Cases" value={stats.total_cases} icon={FolderOpen} />
@@ -448,17 +403,17 @@ export default function CasesPage() {
               <>
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-xs text-text-muted uppercase">
-                      <th className="px-4 py-3 text-left">Case #</th>
-                      <th className="px-4 py-3 text-left">Interactions</th>
-                      <th className="px-4 py-3 text-left">Channels</th>
-                      <th className="px-4 py-3 text-left">Agents</th>
-                      <th className="px-4 py-3 text-left">Pass Rate</th>
+                    <tr className="border-b border-border text-xs text-text-muted">
+                      <SortHeader label="Case #" sortKey="case_number" />
+                      <SortHeader label="Interactions" sortKey="total_interactions" />
+                      <SortHeader label="Channels" sortKey="channels" />
+                      <SortHeader label="Agents" sortKey="agents" />
+                      <SortHeader label="Pass Rate" sortKey="pass_rate" />
                       <th className="px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody>
-                    {cases.map(c => (
+                    {pageRows.map(c => (
                       <tr
                         key={c.id}
                         className="border-b border-border/50 hover:bg-surface2 cursor-pointer transition-colors"
@@ -492,7 +447,7 @@ export default function CasesPage() {
                   </tbody>
                 </table>
                 <div className="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-text-muted">
-                  <span>Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}</span>
+                  <span>Showing {total === 0 ? 0 : (page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}</span>
                   <div className="flex gap-2">
                     <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-2 py-1 rounded border border-border disabled:opacity-30 hover:bg-surface2 transition-colors">Prev</button>
                     <button disabled={page * limit >= total} onClick={() => setPage(p => p + 1)} className="px-2 py-1 rounded border border-border disabled:opacity-30 hover:bg-surface2 transition-colors">Next</button>
@@ -544,17 +499,5 @@ export default function CasesPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function CaseFileDrop({ icon, label, sub, accept, file, onChange }) {
-  return (
-    <label className={`flex flex-col items-center justify-center p-4 border rounded-xl cursor-pointer transition-all text-center ${file ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-border2 hover:border-primary/50 hover:bg-primary/5'}`}>
-      <input type="file" accept={accept} className="hidden" onChange={e => onChange(e.target.files[0] || null)} />
-      {icon}
-      <div className="text-sm font-semibold mt-2 text-text-main">{label}</div>
-      <div className="text-xs text-text-muted mt-0.5">{sub}</div>
-      {file && <div className="text-xs text-emerald-400 font-medium mt-1.5 truncate max-w-full">{file.name}</div>}
-    </label>
   );
 }

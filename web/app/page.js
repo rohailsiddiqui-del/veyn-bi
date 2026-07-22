@@ -136,6 +136,12 @@ export default function AppShell() {
         <div className="flex-1 p-8 pb-10">
           {renderPage()}
         </div>
+        <footer className="sticky bottom-0 z-30 border-t border-border py-3 text-center bg-surface/95 backdrop-blur-sm">
+          <span className="text-xs text-text-muted inline-flex items-center gap-1.5">
+            Powered by
+            <span className="font-semibold bg-gradient-to-r from-primary-soft to-primary bg-clip-text text-transparent">⚡ veyn.ai</span>
+          </span>
+        </footer>
       </main>
     </div>
   );

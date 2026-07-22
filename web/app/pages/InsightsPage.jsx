@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { KpiCard, CardPanel, Badge, Button, Select, Spinner, EmptyState } from '@/app/components/ui';
-import { Phone, MessageSquare, Search, X } from 'lucide-react';
+import { Phone, MessageSquare } from 'lucide-react';
 import { DoughnutChart, BarChart, RadialGauge, RankedBarChart } from '@/app/components/Charts';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -53,25 +53,16 @@ function SentimentBar({ agentName, score }) {
 // ─── signal card ────────────────────────────────────────────────────────────
 
 function SignalCard({ emoji, label, count, colorClass, onClick, active }) {
-  const numericCount = count != null && count !== '—' ? Number(count) : null;
-  const hasSignals = numericCount != null && numericCount > 0;
   return (
     <button
       onClick={onClick}
-      className={`group relative flex flex-col gap-1.5 rounded-xl border p-3.5 text-left transition-all duration-200 cursor-pointer w-full
-        ${active ? colorClass.border + ' ring-1 ring-current/20' : 'border-border hover:border-border2'}
+      className={`group relative flex flex-col gap-1 rounded-xl border p-4 text-left transition-all duration-200 cursor-pointer w-full
+        ${active ? 'border-current ' + colorClass.border : 'border-border hover:border-border2'}
         ${colorClass.bg}`}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-xl leading-none">{emoji}</span>
-        {hasSignals && active && (
-          <span className={`text-[9px] font-bold uppercase tracking-wider ${colorClass.text} opacity-70`}>active</span>
-        )}
-      </div>
-      <div className={`text-2xl font-bold leading-none tabular-nums ${colorClass.text}`}>
-        {count ?? '—'}
-      </div>
-      <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wide leading-tight">{label}</div>
+      <div className="text-2xl">{emoji}</div>
+      <div className={`text-2xl font-bold leading-none ${colorClass.text}`}>{count ?? '—'}</div>
+      <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">{label}</div>
     </button>
   );
 }
@@ -276,7 +267,7 @@ function ExpandedCall({ callId, caseMode }) {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-2">Transcript</div>
           <div className="max-h-64 overflow-y-auto rounded-lg bg-surface border border-border p-3 font-mono text-xs text-text-muted whitespace-pre-wrap leading-relaxed">
-            {transcriptStr}
+            {transcriptStr.replace(/^\s*\[[^\]]*\]\s*/gm, '')}
           </div>
         </div>
       )}
@@ -312,7 +303,7 @@ export default function InsightsPage() {
   const [expandedCallId, setExpandedCallId] = useState(null);
   const [deletingCallId, setDeletingCallId] = useState(null);
   const [channelFilter, setChannelFilter]   = useState(null);
-  const [searchQuery, setSearchQuery]       = useState('');
+  const [sigSort, setSigSort]               = useState({ key: null, dir: 'asc' });
 
   const deleteCall = useCallback(async (callId, e) => {
     e.stopPropagation();
@@ -445,7 +436,7 @@ export default function InsightsPage() {
   };
   const SIGNAL_ORDER = ['threats', 'social', 'escalations', 'regulatory', 'negative', 'positive'];
 
-  const filteredBySignal = signalFilter
+  const displayedSignals = signalFilter
     ? signals.filter((s) => {
         if (signalFilter === 'negative') return s.customer_sentiment_overall?.toLowerCase() === 'negative';
         if (signalFilter === 'positive') return s.customer_sentiment_overall?.toLowerCase() === 'positive';
@@ -458,18 +449,28 @@ export default function InsightsPage() {
       })
     : signals;
 
-  const displayedSignals = searchQuery.trim()
-    ? filteredBySignal.filter((s) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          (s.call_ref ?? '').toLowerCase().includes(q) ||
-          (s.agent_name ?? '').toLowerCase().includes(q) ||
-          (s.call_category ?? '').toLowerCase().includes(q) ||
-          (s.customer_sentiment_overall ?? '').toLowerCase().includes(q) ||
-          (s.summary ?? '').toLowerCase().includes(q)
-        );
+  // Sortable flagged-interactions table
+  const sigAccessor = (s, key) => {
+    switch (key) {
+      case 'ref':     return String(s.call_ref ?? s.callRef ?? s.id ?? s._id ?? '');
+      case 'agent':   return String(s.agent_name ?? s.agent ?? '').toLowerCase();
+      case 'channel': return String(s.channel ?? '').toLowerCase();
+      case 'type':    return String(s.call_category ?? s.category ?? '').toLowerCase();
+      case 'sentiment': { const o = { positive: 4, neutral: 3, mixed: 2, negative: 1 }; return o[String(s.customer_sentiment_overall ?? '').toLowerCase()] ?? 0; }
+      default: return '';
+    }
+  };
+  const finalSignals = sigSort.key
+    ? [...displayedSignals].sort((a, b) => {
+        const va = sigAccessor(a, sigSort.key), vb = sigAccessor(b, sigSort.key);
+        const m = sigSort.dir === 'asc' ? 1 : -1;
+        if (va < vb) return -1 * m;
+        if (va > vb) return 1 * m;
+        return 0;
       })
-    : filteredBySignal;
+    : displayedSignals;
+  const toggleSigSort = (key) => setSigSort(s =>
+    s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
 
   // sentiment distribution has data if any count > 0
   const sentHasData = sentCounts.some(v => v > 0);
@@ -484,15 +485,6 @@ export default function InsightsPage() {
         <div>
           <h1 className="text-2xl font-bold text-text-main tracking-tight">Signal Intelligence &amp; Insights</h1>
           <p className="text-sm text-text-muted mt-0.5">AI-powered analysis of your {isCaseMode ? 'case interactions' : 'call recordings'}</p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <Button id="process-transcripts-btn" variant="primary" onClick={handleProcess} disabled={processing} className="flex items-center gap-2">
-            {processing
-              ? <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
-              : <span>⚙</span>}
-            {isCaseMode ? 'Process Case Insights' : 'Process Transcripts'}
-          </Button>
-          {processStatus && <span className="text-xs text-text-muted">{processStatus}</span>}
         </div>
       </div>
 
@@ -652,26 +644,15 @@ export default function InsightsPage() {
       {/* ── 5. Flagged Interactions Table ── */}
       <CardPanel
         title={isCaseMode ? 'Flagged Interactions' : 'Flagged Calls'}
-        sub={`${displayedSignals.length} of ${filteredBySignal.length} shown${searchQuery ? ' · search active' : ''}`}
+        sub={
+          signalType === 'negative' ? (isCaseMode ? 'Interactions with Negative customer sentiment.' : 'Calls with Negative customer sentiment.')
+          : signalType === 'positive' ? (isCaseMode ? 'Interactions with Positive customer sentiment.' : 'Calls with Positive customer sentiment.')
+          : isCaseMode ? 'Interactions where AI detected at least one signal (threat, escalation, social media mention, or regulatory issue).'
+          : 'Calls where AI detected at least one signal.'
+        }
         action={
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {/* Search */}
-            <div className="relative">
-              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search agent, ref, category…"
-                className="bg-bg border border-border2 rounded-lg pl-7 pr-7 py-1.5 text-xs text-text-main outline-none focus:border-primary transition-colors w-[200px]"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main">
-                  <X size={11} />
-                </button>
-              )}
-            </div>
-            {/* Signal type filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-muted">Signal type</span>
             <Select id="signal-type-filter" value={signalType} onChange={(e) => {
               setSignalType(e.target.value);
               setSignalFilter(null);
@@ -687,20 +668,34 @@ export default function InsightsPage() {
           </div>
         }
       >
-        {displayedSignals.length === 0 ? (
+        {finalSignals.length === 0 ? (
           <EmptyState message={`No flagged ${isCaseMode ? 'interactions' : 'calls'} for the selected filter.`} />
         ) : (
           <div className="overflow-x-auto -mx-1">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border">
-                  {[isCaseMode ? 'Case Ref' : 'Call Ref', 'Agent', isCaseMode ? 'Channel' : 'Date', isCaseMode ? 'Type' : 'Category', 'Flags', 'Sentiment', 'Details', ''].map((h) => (
-                    <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-widest py-2 px-3">{h}</th>
+                  {[
+                    { h: isCaseMode ? 'Case Ref' : 'Call Ref', key: 'ref' },
+                    { h: 'Agent', key: 'agent' },
+                    { h: isCaseMode ? 'Channel' : 'Date', key: 'channel' },
+                    { h: isCaseMode ? 'Type' : 'Category', key: 'type' },
+                    { h: 'Flags', key: null },
+                    { h: 'Sentiment', key: 'sentiment' },
+                    { h: 'Details', key: null },
+                  ].map(({ h, key }) => (
+                    <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-widest py-2 px-3">
+                      {key ? (
+                        <button onClick={() => toggleSigSort(key)} className="inline-flex items-center gap-1 uppercase tracking-widest hover:text-text-main transition-colors">
+                          {h}<span className="text-[9px] opacity-70">{sigSort.key === key ? (sigSort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </button>
+                      ) : h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {displayedSignals.map((sig, idx) => {
+                {finalSignals.map((sig, idx) => {
                   const id = sig.call_id ?? sig.callId ?? sig.id ?? sig._id ?? idx;
                   const isExpanded = expandedCallId === id;
                   const flags = [];
@@ -736,20 +731,10 @@ export default function InsightsPage() {
                         </td>
                         <td className={`py-3 px-3 font-semibold ${sentColor}`}>{sentiment ?? '—'}</td>
                         <td className="py-3 px-3"><span className="text-primary-soft text-xs font-medium">{isExpanded ? '▲ Hide' : '▼ View'}</span></td>
-                        <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => deleteCall(id, e)}
-                            disabled={deletingCallId === id}
-                            title={isCaseMode ? 'Delete this interaction' : 'Delete this call'}
-                            style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, backgroundColor: deletingCallId === id ? '#374151' : 'rgba(239,68,68,0.1)', color: deletingCallId === id ? '#6b7280' : '#f87171', border: '1px solid rgba(239,68,68,0.3)', cursor: deletingCallId === id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
-                          >
-                            {deletingCallId === id ? '…' : 'Delete'}
-                          </button>
-                        </td>
                       </tr>
                       {isExpanded && (
                         <tr className="bg-surface/50">
-                          <td colSpan={8} className="px-5 py-4 border-b border-border">
+                          <td colSpan={7} className="px-5 py-4 border-b border-border">
                             <ExpandedCall callId={id} caseMode={isCaseMode} />
                           </td>
                         </tr>
