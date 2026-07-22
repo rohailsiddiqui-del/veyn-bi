@@ -223,7 +223,7 @@ router.get('/', async (req, res) => {
       SELECT
         COUNT(DISTINCT c.id) as total_cases,
         COUNT(ci.id) as total_interactions,
-        ROUND(AVG(c.total_interactions), 2) as avg_interactions_per_case,
+        ROUND(COUNT(ci.id)::numeric / NULLIF(COUNT(DISTINCT c.id), 0), 2) as avg_interactions_per_case,
         COUNT(DISTINCT CASE WHEN c.total_interactions = 1 THEN c.id END) as single_interaction_cases,
         COUNT(DISTINCT CASE WHEN c.total_interactions > 1 THEN c.id END) as multi_interaction_cases,
         COUNT(DISTINCT ci.agent_name) as unique_agents
@@ -663,7 +663,12 @@ router.get('/insights/all', async (req, res) => {
         FROM case_insights cins
         JOIN case_interactions ci ON ci.id = cins.interaction_id
         WHERE cins.tenant_id=$1 ${chanClause}
-        GROUP BY ci.agent_name ORDER BY avg_customer_sentiment DESC
+        GROUP BY ci.agent_name
+        -- Exclude agents with too few interactions: a single-interaction agent's
+        -- "average" is just that one interaction's score, which produces meaningless
+        -- extremes (0/100) and makes the ranking statistically invalid. Require >=3.
+        HAVING COUNT(*) >= 3
+        ORDER BY avg_customer_sentiment DESC
       `, params1),
 
       pool.query(`
