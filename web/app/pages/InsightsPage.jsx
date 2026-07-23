@@ -486,6 +486,28 @@ export default function InsightsPage() {
           <h1 className="text-2xl font-bold text-text-main tracking-tight">Signal Intelligence &amp; Insights</h1>
           <p className="text-sm text-text-muted mt-0.5">AI-powered analysis of your {isCaseMode ? 'case interactions' : 'call recordings'}</p>
         </div>
+        <div className="flex flex-col items-end gap-3">
+          <button
+            onClick={handleProcess}
+            disabled={processing}
+            style={{
+              background: 'linear-gradient(to right, rgb(139, 92, 246), rgb(167, 139, 250))',
+              color: 'white',
+            }}
+            className="px-4 py-2.5 rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm transition-all active:scale-[0.98] hover:scale-[1.02]"
+          >
+            {processing ? 'Processing…' : 'Process Insights'}
+          </button>
+          {processStatus && (
+            <div className={`text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap ${
+              processStatus.includes('Error')
+                ? 'bg-red-500/10 text-red-400'
+                : 'bg-violet-500/10 text-violet-400'
+            }`}>
+              {processStatus}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Channel Filter Tabs (case-mode only) ── */}
