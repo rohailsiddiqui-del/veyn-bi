@@ -591,6 +591,8 @@ export default function InsightsPage() {
           {error && (
             <div className="rounded-xl border border-danger/30 bg-danger/10 px-5 py-3 text-sm text-danger">{error}</div>
           )}
+        </div>
+      )}
 
       {/* ── 2. KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
