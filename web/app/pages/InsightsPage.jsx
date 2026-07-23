@@ -280,7 +280,7 @@ function ExpandedCall({ callId, caseMode }) {
 export default function InsightsPage() {
   const { apiFetch, globalDateFrom, globalDateTo, user } = useAuth();
   const isCaseMode = user?.dashboard_mode === 'case';
-
+  // v1.2 - Process Transcripts tab added
   const [tab, setTab] = useState('insights');
   const [summary, setSummary]               = useState(null);
   const [categories, setCategories]         = useState([]);
