@@ -281,6 +281,7 @@ export default function InsightsPage() {
   const { apiFetch, globalDateFrom, globalDateTo, user } = useAuth();
   const isCaseMode = user?.dashboard_mode === 'case';
 
+  const [tab, setTab] = useState('insights');
   const [summary, setSummary]               = useState(null);
   const [categories, setCategories]         = useState([]);
   const [signals, setSignals]               = useState([]);
@@ -486,33 +487,38 @@ export default function InsightsPage() {
           <h1 className="text-2xl font-bold text-text-main tracking-tight">Signal Intelligence &amp; Insights</h1>
           <p className="text-sm text-text-muted mt-0.5">AI-powered analysis of your {isCaseMode ? 'case interactions' : 'call recordings'}</p>
         </div>
-        <div className="flex flex-col items-end gap-3">
-          <button
-            onClick={handleProcess}
-            disabled={processing}
-            style={{
-              background: 'linear-gradient(to right, rgb(139, 92, 246), rgb(167, 139, 250))',
-              color: 'white',
-            }}
-            className="px-4 py-2.5 rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm transition-all active:scale-[0.98] hover:scale-[1.02]"
-          >
-            {processing ? 'Processing…' : 'Process Insights'}
-          </button>
-          {processStatus && (
-            <div className={`text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap ${
-              processStatus.includes('Error')
-                ? 'bg-red-500/10 text-red-400'
-                : 'bg-violet-500/10 text-violet-400'
-            }`}>
-              {processStatus}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* ── Channel Filter Tabs (case-mode only) ── */}
-      {isCaseMode && (
-        <div className="flex gap-1 bg-surface border border-border rounded-xl p-1 w-fit">
+      {/* ── Tab Switcher ── */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setTab('insights')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+            tab === 'insights'
+              ? 'border-violet-500 bg-violet-500/10 text-violet-400'
+              : 'border-border2 text-text-label hover:border-border'
+          }`}
+        >
+          📊 Insights
+        </button>
+        <button
+          onClick={() => setTab('process')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+            tab === 'process'
+              ? 'border-violet-500 bg-violet-500/10 text-violet-400'
+              : 'border-border2 text-text-label hover:border-border'
+          }`}
+        >
+          ⚙️ Process Transcripts
+        </button>
+      </div>
+
+      {/* ── Insights Tab Content ── */}
+      {tab === 'insights' && (
+        <div className="space-y-6">
+          {/* ── Channel Filter Tabs (case-mode only) ── */}
+          {isCaseMode && (
+            <div className="flex gap-1 bg-surface border border-border rounded-xl p-1 w-fit">
           {[
             { key: null,       label: 'All Channels', Icon: null },
             { key: 'voice',    label: 'Voice',        Icon: Phone },
@@ -917,6 +923,67 @@ export default function InsightsPage() {
             ) : (
               <EmptyState message="No product data." />
             )}
+          </CardPanel>
+        </div>
+      )}
+        </div>
+      )}
+
+      {/* ── Process Transcripts Tab Content ── */}
+      {tab === 'process' && (
+        <div className="space-y-6">
+          <CardPanel title="Process Transcripts" sub="Trigger the insight processing workflow to analyze and generate AI-powered summaries.">
+            <div className="space-y-6">
+              <div className="p-6 rounded-lg border border-violet-500/20 bg-violet-500/5">
+                <h3 className="text-lg font-semibold text-text-main mb-3">Processing Status</h3>
+                <p className="text-sm text-text-muted mb-4">
+                  Click the button below to start processing {isCaseMode ? 'case interactions' : 'call recordings'}.
+                  The system will analyze all data and generate insights.
+                </p>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleProcess}
+                    disabled={processing}
+                    style={{
+                      background: 'linear-gradient(to right, rgb(139, 92, 246), rgb(167, 139, 250))',
+                      color: 'white',
+                    }}
+                    className="px-6 py-3 rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm transition-all active:scale-[0.98] hover:scale-[1.02]"
+                  >
+                    {processing ? 'Processing…' : 'Start Processing'}
+                  </button>
+
+                  {processStatus && (
+                    <div className={`text-sm px-4 py-2 rounded-lg font-medium ${
+                      processStatus.includes('Error')
+                        ? 'bg-red-500/10 text-red-400'
+                        : 'bg-violet-500/10 text-violet-400'
+                    }`}>
+                      {processStatus}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg border border-border bg-surface/50">
+                  <div className="text-2xl mb-2">🔄</div>
+                  <h4 className="font-semibold text-text-main mb-1">Processing</h4>
+                  <p className="text-xs text-text-muted">Analyze transcripts and generate summaries</p>
+                </div>
+                <div className="p-4 rounded-lg border border-border bg-surface/50">
+                  <div className="text-2xl mb-2">📊</div>
+                  <h4 className="font-semibold text-text-main mb-1">Analytics</h4>
+                  <p className="text-xs text-text-muted">Extract key metrics and insights</p>
+                </div>
+                <div className="p-4 rounded-lg border border-border bg-surface/50">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <h4 className="font-semibold text-text-main mb-1">AI-Powered</h4>
+                  <p className="text-xs text-text-muted">Real-time {isCaseMode ? 'interaction' : 'call'} analysis</p>
+                </div>
+              </div>
+            </div>
           </CardPanel>
         </div>
       )}
