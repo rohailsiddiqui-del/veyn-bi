@@ -493,21 +493,39 @@ export default function InsightsPage() {
       <div className="flex gap-2">
         <button
           onClick={() => setTab('insights')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-            tab === 'insights'
-              ? 'border-violet-500 bg-violet-500/10 text-violet-400'
-              : 'border-border2 text-text-label hover:border-border'
-          }`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: tab === 'insights' ? '1px solid rgb(139, 92, 246)' : '1px solid rgb(55, 65, 81)',
+            backgroundColor: tab === 'insights' ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+            color: tab === 'insights' ? 'rgb(167, 139, 250)' : 'rgb(209, 213, 219)',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
         >
           📊 Insights
         </button>
         <button
           onClick={() => setTab('process')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-            tab === 'process'
-              ? 'border-violet-500 bg-violet-500/10 text-violet-400'
-              : 'border-border2 text-text-label hover:border-border'
-          }`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: tab === 'process' ? '1px solid rgb(139, 92, 246)' : '1px solid rgb(55, 65, 81)',
+            backgroundColor: tab === 'process' ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+            color: tab === 'process' ? 'rgb(167, 139, 250)' : 'rgb(209, 213, 219)',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
         >
           ⚙️ Process Transcripts
         </button>
