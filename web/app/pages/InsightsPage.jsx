@@ -519,28 +519,28 @@ export default function InsightsPage() {
           {/* ── Channel Filter Tabs (case-mode only) ── */}
           {isCaseMode && (
             <div className="flex gap-1 bg-surface border border-border rounded-xl p-1 w-fit">
-          {[
-            { key: null,       label: 'All Channels', Icon: null },
-            { key: 'voice',    label: 'Voice',        Icon: Phone },
-            { key: 'whatsapp', label: 'WhatsApp',     Icon: MessageSquare },
-          ].map(({ key, label, Icon }) => (
-            <button
-              key={String(key)}
-              onClick={() => { setChannelFilter(key); setSignalFilter(null); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                channelFilter === key ? 'bg-primary/20 text-primary-soft font-semibold' : 'text-text-muted hover:text-text-main'
-              }`}
-            >
-              {Icon && <Icon size={12} />}
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+              {[
+                { key: null,       label: 'All Channels', Icon: null },
+                { key: 'voice',    label: 'Voice',        Icon: Phone },
+                { key: 'whatsapp', label: 'WhatsApp',     Icon: MessageSquare },
+              ].map(({ key, label, Icon }) => (
+                <button
+                  key={String(key)}
+                  onClick={() => { setChannelFilter(key); setSignalFilter(null); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                    channelFilter === key ? 'bg-primary/20 text-primary-soft font-semibold' : 'text-text-muted hover:text-text-main'
+                  }`}
+                >
+                  {Icon && <Icon size={12} />}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {error && (
-        <div className="rounded-xl border border-danger/30 bg-danger/10 px-5 py-3 text-sm text-danger">{error}</div>
-      )}
+          {error && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 px-5 py-3 text-sm text-danger">{error}</div>
+          )}
 
       {/* ── 2. KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -924,8 +924,6 @@ export default function InsightsPage() {
               <EmptyState message="No product data." />
             )}
           </CardPanel>
-        </div>
-      )}
         </div>
       )}
 
