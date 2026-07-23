@@ -487,6 +487,38 @@ export default function InsightsPage() {
           <h1 className="text-2xl font-bold text-text-main tracking-tight">Signal Intelligence &amp; Insights</h1>
           <p className="text-sm text-text-muted mt-0.5">AI-powered analysis of your {isCaseMode ? 'case interactions' : 'call recordings'}</p>
         </div>
+        <div className="flex flex-col items-end gap-1.5">
+          <button
+            onClick={handleProcess}
+            disabled={processing}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '9px 18px',
+              borderRadius: '8px',
+              border: '1px solid rgb(139, 92, 246)',
+              backgroundColor: processing ? 'rgba(139, 92, 246, 0.05)' : 'rgba(139, 92, 246, 0.12)',
+              color: processing ? 'rgb(167, 139, 250, 0.6)' : 'rgb(167, 139, 250)',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: processing ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {processing ? '⏳ Processing…' : '⚙️ Process Transcripts'}
+          </button>
+          {processStatus && (
+            <span style={{
+              fontSize: '11px',
+              color: processStatus.includes('Error') ? 'rgb(239, 68, 68)' : 'rgb(16, 185, 129)',
+              fontWeight: '500',
+            }}>
+              {processStatus}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Tab Switcher ── */}
